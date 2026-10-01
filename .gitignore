@@ -1,0 +1,18 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+
+# Node
+node_modules/
+dist/
+
+# Local data (uploads + vector store)
+data/
+
+# Editor / OS
+.vscode/
+Thumbs.db
