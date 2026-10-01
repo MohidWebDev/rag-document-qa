@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -96,6 +97,22 @@ async def upload_document(file: UploadFile = File(...)):
         )
         raise HTTPException(status_code=422, detail=detail)
 
+    segment_records = [
+        {
+            "doc_id": doc_id,
+            "filename": original_name,
+            "segment_index": i,
+            "page": seg.page,
+            "section": seg.section,
+            "text": seg.text,
+        }
+        for i, seg in enumerate(segments)
+    ]
+    (UPLOAD_DIR / f"{doc_id}.segments.json").write_text(
+        json.dumps(segment_records, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
     meta = {
         "doc_id": doc_id,
         "filename": original_name,
@@ -104,6 +121,25 @@ async def upload_document(file: UploadFile = File(...)):
         "segment_count": len(segments),
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
     }
-    (UPLOAD_DIR / f"{doc_id}.json").write_text(json.dumps(meta, indent=2))
+    (UPLOAD_DIR / f"{doc_id}.json").write_text(
+        json.dumps(meta, indent=2), encoding="utf-8"
+    )
 
-    return meta
+    preview = [
+        {"page": r["page"], "section": r["section"], "text": r["text"][:200]}
+        for r in segment_records[:3]
+    ]
+    return {**meta, "preview": preview}
+
+
+@app.get("/documents/{doc_id}/segments")
+def get_segments(doc_id: str):
+    # IDs are 32 hex characters; anything else can't be one of ours
+    if not re.fullmatch(r"[0-9a-f]{32}", doc_id):
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    path = UPLOAD_DIR / f"{doc_id}.segments.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    return json.loads(path.read_text(encoding="utf-8"))
