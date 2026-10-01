@@ -12,3 +12,8 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 # Create folders if they don't exist yet
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Chunking
+CHUNK_SIZE = 800
+CHUNK_OVERLAP = 100
+MIN_SEGMENT_CHARS = 80  # shorter Markdown segments (like lone headings) get merged into the next one
