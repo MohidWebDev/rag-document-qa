@@ -19,7 +19,7 @@ elif cmd == "ask":
     for r in search(sys.argv[2], k=3):
         m = r["metadata"]
         print(f"distance={r['distance']:.3f} | {m.get('filename')} | page={m.get('page')} | section={m.get('section')}")
-        print("   ", r["text"][:150].replace("\n", " "))
+        print("   ", " ".join(r["text"].split())[:150])
 elif cmd == "count":
     print(count())
 elif cmd == "reset":

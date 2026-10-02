@@ -8,6 +8,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from config import (
     ALLOWED_EXTENSIONS,
@@ -16,6 +17,8 @@ from config import (
     UPLOAD_DIR,
 )
 from parsers import DocumentParseError, parse_document
+from chunker import chunk_segments
+from vectorstore import add_chunks, delete_chunks
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -97,6 +100,22 @@ async def upload_document(file: UploadFile = File(...)):
         )
         raise HTTPException(status_code=422, detail=detail)
 
+    # Chunk, embed and store. This is slow, so it runs off the main event loop.
+    chunks = chunk_segments(segments, doc_id, original_name)
+    try:
+        await run_in_threadpool(add_chunks, chunks)
+    except Exception:
+        logger.exception("Indexing failed for %s", original_name)
+        try:
+            await run_in_threadpool(delete_chunks, [c.chunk_id for c in chunks])
+        except Exception:
+            logger.exception("Cleanup of partial chunks failed for %s", doc_id)
+        saved_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=502,
+            detail="Could not index this document right now. Please try again in a moment.",
+        )
+
     segment_records = [
         {
             "doc_id": doc_id,
@@ -119,6 +138,7 @@ async def upload_document(file: UploadFile = File(...)):
         "extension": ext,
         "size_bytes": len(content),
         "segment_count": len(segments),
+        "chunk_count": len(chunks),
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
     }
     (UPLOAD_DIR / f"{doc_id}.json").write_text(

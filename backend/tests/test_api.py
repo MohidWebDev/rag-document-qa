@@ -6,9 +6,15 @@ import main
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    # Save uploads into a temp folder so tests never touch your real data/
+    # Save uploads into a temp folder, and never touch the real vector store
     monkeypatch.setattr(main, "UPLOAD_DIR", tmp_path)
-    return TestClient(main.app)
+    stored = []
+    monkeypatch.setattr(main, "add_chunks", lambda chunks: stored.extend(chunks))
+    monkeypatch.setattr(main, "delete_chunks", lambda ids: None)
+
+    test_client = TestClient(main.app)
+    test_client.stored = stored
+    return test_client
 
 
 def upload(client, name, content):
@@ -56,3 +62,21 @@ def test_fake_pdf_rejected(client):
 def test_unknown_document_returns_404(client):
     assert client.get("/documents/abc/segments").status_code == 404
     assert client.get(f"/documents/{'0' * 32}/segments").status_code == 404
+
+
+def test_upload_indexes_chunks(client):
+    r = upload(client, "notes.txt", b"Hello world. This is a test.")
+    assert r.status_code == 200
+    assert len(client.stored) > 0
+    assert r.json()["chunk_count"] == len(client.stored)
+
+
+def test_failed_indexing_returns_502_and_cleans_up(client, tmp_path, monkeypatch):
+    def broken(chunks):
+        raise RuntimeError("embedding service down")
+
+    monkeypatch.setattr(main, "add_chunks", broken)
+
+    r = upload(client, "notes.txt", b"Hello world. This is a test.")
+    assert r.status_code == 502
+    assert list(tmp_path.iterdir()) == []  # nothing left behind

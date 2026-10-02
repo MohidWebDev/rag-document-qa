@@ -55,6 +55,13 @@ def add_chunks(chunks: list[Chunk], store: Chroma | None = None) -> None:
     )
 
 
+def delete_chunks(ids: list[str], store: Chroma | None = None) -> None:
+    if not ids:
+        return
+    store = store or get_store()
+    store.delete(ids=ids)
+
+
 def search(
     question: str,
     k: int = 5,
