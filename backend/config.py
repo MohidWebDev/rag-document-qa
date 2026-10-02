@@ -22,3 +22,7 @@ MIN_SEGMENT_CHARS = 80  # shorter Markdown segments (like lone headings) get mer
 EMBED_MODEL = "gemini-embedding-001"
 EMBED_DIMENSIONS = 768
 EMBED_BATCH_SIZE = 50
+
+# Vector store
+CHROMA_DIR = DATA_DIR / "chroma"
+COLLECTION_NAME = "documents"

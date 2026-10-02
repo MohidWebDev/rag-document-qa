@@ -1,6 +1,7 @@
 import os
 
 from dotenv import load_dotenv
+from langchain_core.embeddings import Embeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
@@ -60,3 +61,13 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
 def embed_question(text: str) -> list[float]:
     """Embed a user's question for searching."""
     return get_embeddings().embed_query(text, task_type="RETRIEVAL_QUERY")
+
+
+class GeminiEmbeddings(Embeddings):
+    """Lets LangChain (and Chroma) use our batching + retry functions."""
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return embed_texts(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        return embed_question(text)
