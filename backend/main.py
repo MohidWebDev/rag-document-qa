@@ -163,3 +163,49 @@ def get_segments(doc_id: str):
         raise HTTPException(status_code=404, detail="Document not found.")
 
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+DOC_ID_RE = re.compile(r"[0-9a-f]{32}")
+META_FILE_RE = re.compile(r"[0-9a-f]{32}\.json")
+
+
+def load_meta(doc_id: str) -> dict:
+    """Read a document's metadata, or raise a 404."""
+    if not DOC_ID_RE.fullmatch(doc_id):
+        raise HTTPException(status_code=404, detail="Document not found.")
+    path = UPLOAD_DIR / f"{doc_id}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@app.get("/documents")
+def list_documents():
+    docs = [
+        json.loads(p.read_text(encoding="utf-8"))
+        for p in UPLOAD_DIR.iterdir()
+        if META_FILE_RE.fullmatch(p.name)  # skips the *.segments.json files
+    ]
+    return sorted(docs, key=lambda d: d["uploaded_at"], reverse=True)
+
+
+@app.delete("/documents/{doc_id}")
+async def delete_document(doc_id: str):
+    meta = load_meta(doc_id)
+
+    # Vectors first: if this fails, we keep the files so the user can simply retry
+    chunk_ids = [f"{doc_id}-{i}" for i in range(meta.get("chunk_count", 0))]
+    try:
+        await run_in_threadpool(delete_chunks, chunk_ids)
+    except Exception:
+        logger.exception("Could not delete chunks for %s", doc_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not delete this document right now. Please try again.",
+        )
+
+    # The metadata file goes last, so a half-finished delete can be retried
+    for name in (f"{doc_id}{meta['extension']}", f"{doc_id}.segments.json", f"{doc_id}.json"):
+        (UPLOAD_DIR / name).unlink(missing_ok=True)
+
+    return {"deleted": doc_id}
