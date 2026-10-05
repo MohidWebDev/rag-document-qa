@@ -123,3 +123,27 @@ def test_failed_vector_delete_keeps_files(client, tmp_path, monkeypatch):
 
     assert client.delete(f"/documents/{doc_id}").status_code == 500
     assert (tmp_path / f"{doc_id}.json").exists()
+
+
+def test_duplicate_upload_is_rejected(client):
+    first = upload(client, "a.txt", b"same content")
+    assert first.status_code == 200
+    chunks_after_first = len(client.stored)
+
+    second = upload(client, "copy-of-a.txt", b"same content")
+
+    assert second.status_code == 409
+    assert second.json()["detail"]["doc_id"] == first.json()["doc_id"]
+    assert len(client.stored) == chunks_after_first  # nothing was indexed again
+    assert len(client.get("/documents").json()) == 1
+
+
+def test_same_name_different_content_is_allowed(client):
+    assert upload(client, "a.txt", b"version one").status_code == 200
+    assert upload(client, "a.txt", b"version two").status_code == 200
+
+
+def test_can_reupload_after_delete(client):
+    doc_id = upload(client, "a.txt", b"same content").json()["doc_id"]
+    client.delete(f"/documents/{doc_id}")
+    assert upload(client, "a.txt", b"same content").status_code == 200

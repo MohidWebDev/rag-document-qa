@@ -1,4 +1,5 @@
 import json
+import hashlib
 import logging
 import os
 import re
@@ -73,6 +74,18 @@ async def upload_document(file: UploadFile = File(...)):
     if problem:
         raise HTTPException(status_code=400, detail=problem)
 
+    content_hash = hashlib.sha256(content).hexdigest()
+    for existing in all_meta():
+        if existing.get("content_hash") == content_hash:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "This file has already been uploaded.",
+                    "doc_id": existing["doc_id"],
+                    "filename": existing["filename"],
+                },
+            )
+
     doc_id = uuid.uuid4().hex
     saved_path = UPLOAD_DIR / f"{doc_id}{ext}"
     saved_path.write_bytes(content)
@@ -139,6 +152,7 @@ async def upload_document(file: UploadFile = File(...)):
         "size_bytes": len(content),
         "segment_count": len(segments),
         "chunk_count": len(chunks),
+        "content_hash": content_hash,
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
     }
     (UPLOAD_DIR / f"{doc_id}.json").write_text(
@@ -179,14 +193,17 @@ def load_meta(doc_id: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-@app.get("/documents")
-def list_documents():
-    docs = [
+def all_meta() -> list[dict]:
+    return [
         json.loads(p.read_text(encoding="utf-8"))
         for p in UPLOAD_DIR.iterdir()
         if META_FILE_RE.fullmatch(p.name)  # skips the *.segments.json files
     ]
-    return sorted(docs, key=lambda d: d["uploaded_at"], reverse=True)
+
+
+@app.get("/documents")
+def list_documents():
+    return sorted(all_meta(), key=lambda d: d["uploaded_at"], reverse=True)
 
 
 @app.delete("/documents/{doc_id}")
