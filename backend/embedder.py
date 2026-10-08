@@ -1,11 +1,11 @@
 import os
+import config
 
 from dotenv import load_dotenv
 from langchain_core.embeddings import Embeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
+from retry_policy import gemini_retry
 
-import config
 
 load_dotenv()
 
@@ -27,24 +27,7 @@ def get_embeddings() -> GoogleGenerativeAIEmbeddings:
     return _embeddings
 
 
-def _is_retryable(exc: BaseException) -> bool:
-    """Retry rate limits and temporary server problems, never bad keys or bad input."""
-    code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
-    if code in (429, 500, 502, 503, 504):
-        return True
-    text = str(exc)
-    return any(s in text for s in ("429", "503", "UNAVAILABLE", "RESOURCE_EXHAUSTED"))
-
-
-_retry = retry(
-    retry=retry_if_exception(_is_retryable),
-    stop=stop_after_attempt(5),
-    wait=wait_exponential(multiplier=2, min=2, max=30),
-    reraise=True,
-)
-
-
-@_retry
+@gemini_retry
 def _embed_batch(texts: list[str]) -> list[list[float]]:
     return get_embeddings().embed_documents(texts, task_type="RETRIEVAL_DOCUMENT")
 
@@ -57,7 +40,7 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     return vectors
 
 
-@_retry
+@gemini_retry
 def embed_question(text: str) -> list[float]:
     """Embed a user's question for searching."""
     return get_embeddings().embed_query(text, task_type="RETRIEVAL_QUERY")

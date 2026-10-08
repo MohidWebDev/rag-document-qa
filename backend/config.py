@@ -30,3 +30,7 @@ COLLECTION_NAME = "documents"
 # Retrieval
 RETRIEVAL_K = 5
 RETRIEVAL_MAX_DISTANCE = 0.42  # starting guess; tuned in 3.5/3.6
+
+# Chat model
+CHAT_MODEL = "gemini-3.8-flash"
+CHAT_THINKING_LEVEL = "low"

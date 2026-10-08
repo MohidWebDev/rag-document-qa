@@ -55,8 +55,15 @@ Known limitations to fix after the core project works end to end.
 - [ ] Split test-only packages (`pytest`, `httpx2`) into a separate requirements file
 - [ ] Add an automated PDF test with a small sample PDF
 - [ ] Write the README (architecture, setup, evaluation results)
+- [ ] The chat call uses the Google SDK directly because LangChain's wrapper triggers the AFC warning; re-check whether the wrapper can disable it, and switch back if so
 
 Under Chunking: - [ ] Very short chunks (for example page footers) can rank highly for vague questions; merge or filter them
 Under Vector store and deployment: - [ ] The retrieval cutoff (0.42) was tuned on 2 documents and 3 questions; re-tune with a larger evaluation set
 Under API and security: - [ ] The /search debug endpoint is open to anyone; remove or protect it
 Under Project hygiene: - [ ] FakeEmbeddings is copy-pasted in several test files; move it to a shared conftest.py
+
+The chat call has no request timeout, so a hung request could wait a long time.
+Answers aren't streamed yet, so the user waits for the full reply.
+Gemini 3 should run at its default temperature, so answers vary a little between runs, and the evaluation in 3.6 has to allow for that.
+The model name is a constant that can be retired by Google, as gemini-2.5-flash was, so we'll need to watch for that.
+Token usage isn't logged, so there's no cost tracking yet.
