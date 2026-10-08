@@ -55,3 +55,8 @@ Known limitations to fix after the core project works end to end.
 - [ ] Split test-only packages (`pytest`, `httpx2`) into a separate requirements file
 - [ ] Add an automated PDF test with a small sample PDF
 - [ ] Write the README (architecture, setup, evaluation results)
+
+Under Chunking: - [ ] Very short chunks (for example page footers) can rank highly for vague questions; merge or filter them
+Under Vector store and deployment: - [ ] The retrieval cutoff (0.42) was tuned on 2 documents and 3 questions; re-tune with a larger evaluation set
+Under API and security: - [ ] The /search debug endpoint is open to anyone; remove or protect it
+Under Project hygiene: - [ ] FakeEmbeddings is copy-pasted in several test files; move it to a shared conftest.py

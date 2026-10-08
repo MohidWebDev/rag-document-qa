@@ -26,3 +26,7 @@ EMBED_BATCH_SIZE = 50
 # Vector store
 CHROMA_DIR = DATA_DIR / "chroma"
 COLLECTION_NAME = "documents"
+
+# Retrieval
+RETRIEVAL_K = 5
+RETRIEVAL_MAX_DISTANCE = 0.42  # starting guess; tuned in 3.5/3.6

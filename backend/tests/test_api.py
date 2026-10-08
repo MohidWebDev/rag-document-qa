@@ -1,7 +1,7 @@
 import pytest
-from fastapi.testclient import TestClient
-
 import main
+from fastapi.testclient import TestClient
+from retriever import RetrievedChunk
 
 
 @pytest.fixture()
@@ -147,3 +147,38 @@ def test_can_reupload_after_delete(client):
     doc_id = upload(client, "a.txt", b"same content").json()["doc_id"]
     client.delete(f"/documents/{doc_id}")
     assert upload(client, "a.txt", b"same content").status_code == 200
+
+
+def test_search_endpoint(client, monkeypatch):
+    doc_id = upload(client, "a.txt", b"some text here").json()["doc_id"]
+
+    def fake_retrieve(q, k, doc, max_distance):
+        return [
+            RetrievedChunk(
+                chunk_id=f"{doc_id}-0", doc_id=doc_id, filename="a.txt",
+                text="some text here", page=None, section=None,
+                distance=0.2, similarity=0.8,
+            )
+        ]
+
+    monkeypatch.setattr(main, "retrieve", fake_retrieve)
+    r = client.get("/search", params={"q": "text", "doc_id": doc_id})
+    assert r.status_code == 200
+    assert r.json()[0]["filename"] == "a.txt"
+
+
+def test_search_rejects_empty_question(client):
+    assert client.get("/search", params={"q": ""}).status_code == 422
+
+
+def test_search_unknown_document_returns_404(client):
+    r = client.get("/search", params={"q": "x", "doc_id": "0" * 32})
+    assert r.status_code == 404
+
+
+def test_search_failure_returns_502(client, monkeypatch):
+    def broken(q, k, doc, max_distance):
+        raise RuntimeError("embedding service down")
+
+    monkeypatch.setattr(main, "retrieve", broken)
+    assert client.get("/search", params={"q": "text"}).status_code == 502

@@ -4,12 +4,13 @@ import logging
 import os
 import re
 import uuid
+
 from datetime import datetime, timezone
 from pathlib import Path
-
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
+from dataclasses import asdict
 
 from config import (
     ALLOWED_EXTENSIONS,
@@ -20,6 +21,7 @@ from config import (
 from parsers import DocumentParseError, parse_document
 from chunker import chunk_segments
 from vectorstore import add_chunks, delete_chunks
+from retriever import retrieve
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -226,3 +228,25 @@ async def delete_document(doc_id: str):
         (UPLOAD_DIR / name).unlink(missing_ok=True)
 
     return {"deleted": doc_id}
+
+
+@app.get("/search")
+async def search_documents(
+    q: str = Query(..., min_length=1, max_length=500),
+    k: int = Query(5, ge=1, le=20),
+    doc_id: str | None = None,
+    max_distance: float | None = Query(None, ge=0, le=2),
+):
+    """Debug/inspection endpoint: shows exactly what retrieval finds for a question."""
+    if doc_id:
+        load_meta(doc_id)  # 404 if the ID is malformed or unknown
+
+    try:
+        chunks = await run_in_threadpool(retrieve, q, k, doc_id, max_distance)
+    except Exception:
+        logger.exception("Search failed")
+        raise HTTPException(
+            status_code=502,
+            detail="Could not search right now. Please try again in a moment.",
+        )
+    return [asdict(c) for c in chunks]
