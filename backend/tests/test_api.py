@@ -2,6 +2,7 @@ import pytest
 import main
 from fastapi.testclient import TestClient
 from retriever import RetrievedChunk
+from prompts import NO_ANSWER
 
 
 @pytest.fixture()
@@ -182,3 +183,79 @@ def test_search_failure_returns_502(client, monkeypatch):
 
     monkeypatch.setattr(main, "retrieve", broken)
     assert client.get("/search", params={"q": "text"}).status_code == 502
+
+
+def rc(n, filename="a.txt", page=None, section=None):
+    return RetrievedChunk(
+        chunk_id=f"d-{n}", doc_id="d", filename=filename, text=f"text {n}",
+        page=page, section=section, distance=0.3, similarity=0.7,
+    )
+
+
+def patch_ask(monkeypatch, chunks, answer="Answer."):
+    calls = {"retrieve": [], "llm": 0}
+
+    def fake_retrieve(q, k, doc, max_distance=None):
+        calls["retrieve"].append({"q": q, "doc": doc})
+        return chunks
+
+    def fake_llm(messages):
+        calls["llm"] += 1
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(main, "retrieve", fake_retrieve)
+    monkeypatch.setattr(main, "generate_answer", fake_llm)
+    return calls
+
+
+def test_ask_returns_answer_with_only_cited_sources(client, monkeypatch):
+    patch_ask(monkeypatch, [rc(0, "a.pdf", page=1), rc(1, "b.md", section="Setup")], "It is X [2].")
+    r = client.post("/ask", json={"question": "What is X?"})
+    body = r.json()
+    assert r.status_code == 200
+    assert body["answered"] is True
+    assert [s["number"] for s in body["sources"]] == [2]
+    assert body["sources"][0]["filename"] == "b.md"
+
+
+def test_ask_without_citations_returns_all_sources(client, monkeypatch):
+    patch_ask(monkeypatch, [rc(0), rc(1)], "An answer with no citations.")
+    body = client.post("/ask", json={"question": "What is X?"}).json()
+    assert [s["number"] for s in body["sources"]] == [1, 2]
+
+
+def test_ask_with_no_relevant_chunks_skips_the_model(client, monkeypatch):
+    calls = patch_ask(monkeypatch, [])
+    body = client.post("/ask", json={"question": "What is X?"}).json()
+    assert body == {"answer": NO_ANSWER, "answered": False, "sources": []}
+    assert calls["llm"] == 0
+
+
+def test_ask_when_model_says_not_found(client, monkeypatch):
+    patch_ask(monkeypatch, [rc(0)], NO_ANSWER)
+    body = client.post("/ask", json={"question": "What is X?"}).json()
+    assert body["answered"] is False
+    assert body["sources"] == []
+
+
+def test_ask_rejects_blank_question(client):
+    assert client.post("/ask", json={"question": "   "}).status_code == 422
+
+
+def test_ask_unknown_document_returns_404(client):
+    r = client.post("/ask", json={"question": "What is X?", "doc_id": "0" * 32})
+    assert r.status_code == 404
+
+
+def test_ask_model_failure_returns_502(client, monkeypatch):
+    patch_ask(monkeypatch, [rc(0)], RuntimeError("model down"))
+    assert client.post("/ask", json={"question": "What is X?"}).status_code == 502
+
+
+def test_ask_passes_the_document_filter(client, monkeypatch):
+    doc_id = upload(client, "a.txt", b"some text here").json()["doc_id"]
+    calls = patch_ask(monkeypatch, [rc(0)])
+    client.post("/ask", json={"question": "What is X?", "doc_id": doc_id})
+    assert calls["retrieve"][0]["doc"] == doc_id

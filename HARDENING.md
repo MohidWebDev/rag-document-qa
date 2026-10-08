@@ -24,6 +24,7 @@ Known limitations to fix after the core project works end to end.
 - [ ] Overlap does not cross page or section boundaries
 - [ ] Default separators do not split on sentence ends
 - [ ] Tables and code blocks can be cut in the middle
+- [ ] Very short chunks (for example page footers) can rank highly for vague questions; merge or filter them
 
 ## Embeddings
 
@@ -31,6 +32,8 @@ Known limitations to fix after the core project works end to end.
 - [ ] Free-tier rate limits can slow large uploads
 - [ ] Indexing happens inside the upload request; use background jobs with a status
 - [ ] Question embeddings are not cached
+- [ ] No conversation memory yet: each question is answered independently
+- [ ] The sources are filtered by parsing [n] from the answer, so a wrongly numbered citation would show the wrong source
 
 ## Vector store and deployment
 
@@ -40,6 +43,7 @@ Known limitations to fix after the core project works end to end.
 - [ ] `count()` loads every record
 - [ ] Deployment needs a persistent disk for `data/`
 - [ ] Python 3.11 is required (Chroma crashes on Python 3.13 on Windows): document in the README and any Dockerfile
+- [ ] The retrieval cutoff (0.42) was tuned on 2 documents and 3 questions; re-tune with a larger evaluation set
 
 ## API and security
 
@@ -48,6 +52,9 @@ Known limitations to fix after the core project works end to end.
 - [ ] Listing and the duplicate check read every metadata file
 - [ ] Delete is not atomic across Chroma and the files
 - [ ] Duplicate check has no locking; only byte-identical files are caught; older documents have no hash
+- [ ] /ask and /upload have no rate limiting, so anyone who can reach the server can spend the Gemini quota
+- [ ] Each /ask makes two API calls (embedding + answer); add caching or limits
+- [ ] The /search debug endpoint is open to anyone; remove or protect it
 
 ## Project hygiene
 
@@ -56,14 +63,4 @@ Known limitations to fix after the core project works end to end.
 - [ ] Add an automated PDF test with a small sample PDF
 - [ ] Write the README (architecture, setup, evaluation results)
 - [ ] The chat call uses the Google SDK directly because LangChain's wrapper triggers the AFC warning; re-check whether the wrapper can disable it, and switch back if so
-
-Under Chunking: - [ ] Very short chunks (for example page footers) can rank highly for vague questions; merge or filter them
-Under Vector store and deployment: - [ ] The retrieval cutoff (0.42) was tuned on 2 documents and 3 questions; re-tune with a larger evaluation set
-Under API and security: - [ ] The /search debug endpoint is open to anyone; remove or protect it
-Under Project hygiene: - [ ] FakeEmbeddings is copy-pasted in several test files; move it to a shared conftest.py
-
-The chat call has no request timeout, so a hung request could wait a long time.
-Answers aren't streamed yet, so the user waits for the full reply.
-Gemini 3 should run at its default temperature, so answers vary a little between runs, and the evaluation in 3.6 has to allow for that.
-The model name is a constant that can be retired by Google, as gemini-2.5-flash was, so we'll need to watch for that.
-Token usage isn't logged, so there's no cost tracking yet.
+- [ ] FakeEmbeddings is copy-pasted in several test files; move it to a shared conftest.py

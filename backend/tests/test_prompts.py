@@ -1,4 +1,4 @@
-from prompts import NO_ANSWER, SYSTEM_PROMPT, build_messages, build_sources
+from prompts import NO_ANSWER, SYSTEM_PROMPT, build_messages, build_sources, cited_numbers
 from retriever import RetrievedChunk
 
 
@@ -43,3 +43,8 @@ def test_sources_match_numbering_and_snippets_are_short():
     assert [s["number"] for s in sources] == [1, 2]
     assert len(sources[0]["snippet"]) <= 200
     assert sources[1]["page"] == 2
+
+
+def test_cited_numbers():
+    assert cited_numbers("A [1][3] and B [2].") == {1, 2, 3}
+    assert cited_numbers("no citations here") == set()

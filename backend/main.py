@@ -11,6 +11,13 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from dataclasses import asdict
+from parsers import DocumentParseError, parse_document
+from chunker import chunk_segments
+from vectorstore import add_chunks, delete_chunks
+from retriever import retrieve
+from pydantic import BaseModel, Field, field_validator
+from llm import generate_answer
+from prompts import NO_ANSWER, build_messages, build_sources, cited_numbers
 
 from config import (
     ALLOWED_EXTENSIONS,
@@ -18,10 +25,6 @@ from config import (
     MAX_FILE_SIZE_MB,
     UPLOAD_DIR,
 )
-from parsers import DocumentParseError, parse_document
-from chunker import chunk_segments
-from vectorstore import add_chunks, delete_chunks
-from retriever import retrieve
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -250,3 +253,62 @@ async def search_documents(
             detail="Could not search right now. Please try again in a moment.",
         )
     return [asdict(c) for c in chunks]
+
+
+class AskRequest(BaseModel):
+    question: str = Field(..., max_length=1000)
+    doc_id: str | None = None
+
+    @field_validator("question")
+    @classmethod
+    def not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Question must not be empty.")
+        return value
+
+
+@app.post("/ask")
+async def ask(req: AskRequest):
+    if req.doc_id:
+        load_meta(req.doc_id)  # 404 if the ID is malformed or unknown
+
+    try:
+        chunks = await run_in_threadpool(retrieve, req.question, None, req.doc_id)
+    except Exception:
+        logger.exception("Retrieval failed")
+        raise HTTPException(
+            status_code=502,
+            detail="Could not search the documents right now. Please try again in a moment.",
+        )
+
+    # Nothing relevant: don't spend an LLM call
+    if not chunks:
+        return {"answer": NO_ANSWER, "answered": False, "sources": []}
+
+    messages = build_messages(req.question, chunks)
+    try:
+        answer = await run_in_threadpool(generate_answer, messages)
+    except Exception:
+        logger.exception("Answer generation failed")
+        raise HTTPException(
+            status_code=502,
+            detail="Could not generate an answer right now. Please try again in a moment.",
+        )
+
+    if not answer:
+        logger.warning("The model returned an empty answer")
+        raise HTTPException(
+            status_code=502,
+            detail="The model returned an empty answer. Please try again.",
+        )
+
+    if answer.startswith(NO_ANSWER):
+        return {"answer": NO_ANSWER, "answered": False, "sources": []}
+
+    sources = build_sources(chunks)
+    cited = cited_numbers(answer)
+    if cited:
+        sources = [s for s in sources if s["number"] in cited]
+
+    return {"answer": answer, "answered": True, "sources": sources}

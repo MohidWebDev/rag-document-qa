@@ -1,4 +1,5 @@
 from retriever import RetrievedChunk
+import re
 
 NO_ANSWER = "I couldn't find the answer to that in the uploaded documents."
 
@@ -50,3 +51,11 @@ def build_sources(chunks: list[RetrievedChunk], snippet_chars: int = 200) -> lis
         }
         for i, c in enumerate(chunks, start=1)
     ]
+
+
+CITATION_RE = re.compile(r"\[(\d+)\]")
+
+
+def cited_numbers(answer: str) -> set[int]:
+    """The source numbers the model cited, like [1] or [2][3]."""
+    return {int(n) for n in CITATION_RE.findall(answer)}
