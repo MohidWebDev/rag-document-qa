@@ -25,6 +25,7 @@ Known limitations to fix after the core project works end to end.
 - [ ] Default separators do not split on sentence ends
 - [ ] Tables and code blocks can be cut in the middle
 - [ ] Very short chunks (for example page footers) can rank highly for vague questions; merge or filter them
+- [ ] The experiment measures retrieval only (keyword match), not answer quality; add graded answer checks
 
 ## Embeddings
 

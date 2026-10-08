@@ -1,18 +1,33 @@
 [
   {
     "label": "answer",
-    "q": "Which tasks in the task list are still unchecked?"
+    "q": "Which tasks in the task list are still unchecked?",
+    "expect": ["authentication middleware"]
   },
-  { "label": "answer", "q": "What command is used to build the project?" },
-  { "label": "answer", "q": "What is the processing latency?" },
   {
     "label": "answer",
-    "q": "Which module in the sample log is still pending?"
+    "q": "What command is used to build the project?",
+    "expect": ["npm run build"]
   },
-  { "label": "answer", "q": "What raster DPI does the PDF mention?" },
   {
     "label": "answer",
-    "q": "What does the concluding statement say about the layout engine?"
+    "q": "What is the processing latency?",
+    "expect": ["14ms"]
+  },
+  {
+    "label": "answer",
+    "q": "Which module in the sample log is still pending?",
+    "expect": ["Color Calibration"]
+  },
+  {
+    "label": "answer",
+    "q": "What raster DPI does the PDF mention?",
+    "expect": ["300"]
+  },
+  {
+    "label": "answer",
+    "q": "What does the concluding statement say about the layout engine?",
+    "expect": ["operating according"]
   },
 
   { "label": "offtopic", "q": "What is the capital of France?" },
