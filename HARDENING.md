@@ -55,6 +55,7 @@ Known limitations to fix after the core project works end to end.
 - [ ] /ask and /upload have no rate limiting, so anyone who can reach the server can spend the Gemini quota
 - [ ] Each /ask makes two API calls (embedding + answer); add caching or limits
 - [ ] The /search debug endpoint is open to anyone; remove or protect it
+- [ ] The evaluation set is small and written for the sample documents; extend it with real documents
 
 ## Project hygiene
 

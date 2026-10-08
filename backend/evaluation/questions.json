@@ -1,0 +1,35 @@
+[
+  {
+    "label": "answer",
+    "q": "Which tasks in the task list are still unchecked?"
+  },
+  { "label": "answer", "q": "What command is used to build the project?" },
+  { "label": "answer", "q": "What is the processing latency?" },
+  {
+    "label": "answer",
+    "q": "Which module in the sample log is still pending?"
+  },
+  { "label": "answer", "q": "What raster DPI does the PDF mention?" },
+  {
+    "label": "answer",
+    "q": "What does the concluding statement say about the layout engine?"
+  },
+
+  { "label": "offtopic", "q": "What is the capital of France?" },
+  { "label": "offtopic", "q": "How do I bake sourdough bread?" },
+  { "label": "offtopic", "q": "Who won the 2018 FIFA World Cup?" },
+  { "label": "offtopic", "q": "Explain how photosynthesis works." },
+  { "label": "offtopic", "q": "What is the best way to learn guitar?" },
+
+  { "label": "nearmiss", "q": "What is the latency of module #SYS-110?" },
+  { "label": "nearmiss", "q": "Who wrote the Markdown test document?" },
+  {
+    "label": "nearmiss",
+    "q": "Which version of Node.js does the build script require?"
+  },
+  { "label": "nearmiss", "q": "Who approved the system test baseline?" },
+  {
+    "label": "nearmiss",
+    "q": "What was the processing latency in September 2026?"
+  }
+]
