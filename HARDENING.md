@@ -26,6 +26,7 @@ Known limitations to fix after the core project works end to end.
 - [ ] Tables and code blocks can be cut in the middle
 - [ ] Very short chunks (for example page footers) can rank highly for vague questions; merge or filter them
 - [ ] The experiment measures retrieval only (keyword match), not answer quality; add graded answer checks
+- [ ] Re-run the chunk-size experiment (evaluation/run_experiments.py) on a real, long document; the current results.md used two tiny samples
 
 ## Embeddings
 
@@ -65,4 +66,4 @@ Known limitations to fix after the core project works end to end.
 - [ ] Add an automated PDF test with a small sample PDF
 - [ ] Write the README (architecture, setup, evaluation results)
 - [ ] The chat call uses the Google SDK directly because LangChain's wrapper triggers the AFC warning; re-check whether the wrapper can disable it, and switch back if so
-- [ ] FakeEmbeddings is copy-pasted in several test files; move it to a shared conftest.py
+- [x] FakeEmbeddings shared in tests/fakes.py
