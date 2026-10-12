@@ -1,20 +1,44 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# AskMyDocs frontend
 
-# Run and deploy your AI Studio app
+React + Vite UI for the RAG document Q&A backend in [`../backend`](../backend).
+The design came from Stitch and AI Studio; it is now connected to the FastAPI API.
 
-This contains everything you need to run your app locally.
+## Run locally
 
-View your app in AI Studio: https://ai.studio/apps/e6843c8b-b2f7-4cee-8942-8edc7a784000
+You need both servers running.
 
-## Run Locally
+**1. Backend** (from `backend/`, with `GEMINI_API_KEY` set in `backend/.env`):
 
-**Prerequisites:**  Node.js
+```bash
+uvicorn main:app --reload --port 8000
+```
 
+**2. Frontend** (from `frontend/`):
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:3000. The dev server forwards every `/api/*` request to the
+backend at `BACKEND_URL` (default `http://127.0.0.1:8000`), so the browser never makes a
+cross-origin request.
+
+## How the UI uses the API
+
+| UI | Endpoint |
+| --- | --- |
+| Startup, offline banner, settings | `GET /health`, `GET /config` |
+| Document list (corpus panel, scope picker) | `GET /documents` |
+| Upload panel (progress, duplicate, errors) | `POST /upload` |
+| Delete document | `DELETE /documents/{doc_id}` |
+| Asking questions (all documents, or one) | `POST /ask` |
+| "Jump to page" / "View in document" | `GET /documents/{doc_id}/segments` |
+
+All calls go through [`src/api.ts`](src/api.ts).
+
+## Deploying
+
+`npm run build` writes static files to `dist/`. Either serve them behind a reverse proxy
+that forwards `/api/*` to the backend, or build with `VITE_API_URL=https://your-api`
+and add the site's origin to `CORS_ORIGINS` in `backend/.env`.

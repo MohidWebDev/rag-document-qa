@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
-import { Paperclip, Mic, ArrowUp, Lock, ShieldCheck } from 'lucide-react';
+import { Paperclip, ArrowUp, Lock, ShieldCheck, Loader2 } from 'lucide-react';
+
+/** Matches AskRequest.question max_length in backend/main.py */
+const MAX_QUESTION_LENGTH = 1000;
 
 interface ChatInputBarProps {
   isDisabled?: boolean;
+  /** An answer is on its way: typing is allowed, sending is not */
+  isBusy?: boolean;
   onSendMessage?: (message: string) => void;
   onAttachClick?: () => void;
   placeholder?: string;
@@ -10,6 +15,7 @@ interface ChatInputBarProps {
 
 export const ChatInputBar: React.FC<ChatInputBarProps> = ({
   isDisabled = false,
+  isBusy = false,
   onSendMessage,
   onAttachClick,
   placeholder = 'Ask a question about this document or synthesized corpus...',
@@ -18,7 +24,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isDisabled || !inputText.trim()) return;
+    if (isDisabled || isBusy || !inputText.trim()) return;
     if (onSendMessage) {
       onSendMessage(inputText.trim());
       setInputText('');
@@ -35,6 +41,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
             type="text"
             value={inputText}
             disabled={isDisabled}
+            maxLength={MAX_QUESTION_LENGTH}
             onChange={(e) => setInputText(e.target.value)}
             placeholder={placeholder}
             className="w-full bg-transparent text-xs sm:text-sm text-[#1C1D1B] placeholder:text-[#656860] focus:outline-hidden pb-2.5 sm:pb-3"
@@ -61,34 +68,28 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                 <span className="xs:hidden">Strict</span>
               </div>
 
-              {/* Mic Icon */}
-              <button
-                type="button"
-                className="p-1 rounded-full text-[#656860] hover:text-[#1C1D1B] hover:bg-[#F8F6F0] transition-colors"
-                title="Voice input"
-              >
-                <Mic className="w-3.5 h-3.5" />
-              </button>
             </div>
 
             {/* Right controls */}
             <div className="flex items-center gap-2 sm:gap-3 ml-auto">
               <span className="font-mono text-[10.5px] sm:text-[11px] text-[#656860] hidden md:inline">
-                Press ↵ Enter to synthesize
+                {inputText.length > MAX_QUESTION_LENGTH * 0.8
+                  ? `${inputText.length} / ${MAX_QUESTION_LENGTH}`
+                  : 'Press ↵ Enter to synthesize'}
               </span>
 
               {/* Send Button */}
               <button
                 type="submit"
-                disabled={isDisabled || !inputText.trim()}
+                disabled={isDisabled || isBusy || !inputText.trim()}
                 className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                  inputText.trim()
+                  inputText.trim() && !isBusy && !isDisabled
                     ? 'bg-[#8A3E00] text-white hover:bg-[#723200] cursor-pointer shadow-xs'
-                    : 'bg-[#8A3E00] text-white cursor-pointer opacity-90'
+                    : 'bg-[#8A3E00] text-white cursor-not-allowed opacity-60'
                 }`}
-                title="Send query"
+                title={isBusy ? 'Waiting for the answer...' : 'Send query'}
               >
-                <ArrowUp className="w-4 h-4 stroke-[2.4]" />
+                {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4 stroke-[2.4]" />}
               </button>
             </div>
           </div>

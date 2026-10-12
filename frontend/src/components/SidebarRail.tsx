@@ -97,7 +97,7 @@ export const SidebarRail: React.FC<SidebarRailProps> = ({
             <div>
               <p className="text-xs font-semibold text-[#1C1D1B]">Corpus Index</p>
               <p className="text-[11px] font-mono text-[#656860] tabular-nums mt-0.5">
-                {verifiedChunksCount.toLocaleString()} chunks verified
+                {verifiedChunksCount.toLocaleString()} chunks indexed
               </p>
             </div>
             <div className="w-5 h-5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-700 flex items-center justify-center shrink-0">

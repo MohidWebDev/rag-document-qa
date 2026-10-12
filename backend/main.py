@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
 from dataclasses import asdict
 from parsers import DocumentParseError, parse_document
@@ -19,6 +20,7 @@ from pydantic import BaseModel, Field, field_validator
 from llm import generate_answer
 from prompts import NO_ANSWER, build_messages, build_sources, cited_numbers
 
+import config
 from config import (
     ALLOWED_EXTENSIONS,
     MAX_FILE_SIZE_BYTES,
@@ -31,6 +33,20 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="RAG Document QA API")
 
+# Browsers only let the frontend call us from origins listed here.
+# In development the Vite dev server proxies /api, so this mostly matters for deployed builds.
+cors_origins = [
+    o.strip()
+    for o in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+    if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/")
 def root():
@@ -42,6 +58,22 @@ def health():
     return {
         "status": "ok",
         "gemini_key_loaded": bool(os.getenv("GEMINI_API_KEY")),
+    }
+
+
+@app.get("/config")
+def get_config():
+    """Read-only settings the frontend shows and uses for client-side checks."""
+    return {
+        "allowed_extensions": sorted(ALLOWED_EXTENSIONS),
+        "max_file_size_mb": MAX_FILE_SIZE_MB,
+        "chunk_size": config.CHUNK_SIZE,
+        "chunk_overlap": config.CHUNK_OVERLAP,
+        "embed_model": config.EMBED_MODEL,
+        "embed_dimensions": config.EMBED_DIMENSIONS,
+        "retrieval_k": config.RETRIEVAL_K,
+        "retrieval_max_distance": config.RETRIEVAL_MAX_DISTANCE,
+        "chat_model": config.CHAT_MODEL,
     }
 
 

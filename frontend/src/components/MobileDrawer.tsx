@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   Layers,
   Plus,
-  Check
+  Check,
+  Trash2
 } from 'lucide-react';
 import { NavTab, DocumentItem } from '../types';
 
@@ -20,10 +21,14 @@ interface MobileDrawerProps {
   activeTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   documents: DocumentItem[];
-  activeDocName: string;
-  onSelectDocument: (name: string) => void;
+  /** Selected doc_id, or null for all documents */
+  activeDocId: string | null;
+  onSelectDocument: (docId: string | null) => void;
   onOpenSettings: () => void;
   onAddDocument: () => void;
+  onDeleteDocument: (doc: DocumentItem) => void;
+  minSimilarityPercent?: number;
+  retrievalK?: number;
 }
 
 export const MobileDrawer: React.FC<MobileDrawerProps> = ({
@@ -32,11 +37,15 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
   activeTab,
   onSelectTab,
   documents,
-  activeDocName,
+  activeDocId,
   onSelectDocument,
   onOpenSettings,
   onAddDocument,
+  onDeleteDocument,
+  minSimilarityPercent,
+  retrievalK,
 }) => {
+  const totalChunks = documents.reduce((sum, d) => sum + d.chunkCount, 0);
   const [activeSection, setActiveSection] = useState<'corpus' | 'nav'>('corpus');
 
   if (!isOpen) return null;
@@ -108,13 +117,29 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
               </div>
 
               <div className="space-y-2">
+                {documents.length > 0 && (
+                  <div
+                    onClick={() => {
+                      onSelectDocument(null);
+                      onClose();
+                    }}
+                    className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
+                      activeDocId === null
+                        ? 'bg-white border-l-3 border-l-[#C25E00] border-y border-r border-[#E2E0D8] shadow-2xs'
+                        : 'bg-[#F8F6F0] hover:bg-white border-[#E2E0D8]'
+                    }`}
+                  >
+                    <p className="text-xs font-bold text-[#1C1D1B]">All Documents</p>
+                    <p className="text-[10px] font-mono text-[#656860]">{totalChunks.toLocaleString()} chunks</p>
+                  </div>
+                )}
                 {documents.map((doc) => {
-                  const isActive = doc.name === activeDocName;
+                  const isActive = doc.id === activeDocId;
                   return (
                     <div
                       key={doc.id}
                       onClick={() => {
-                        onSelectDocument(doc.name);
+                        onSelectDocument(doc.id);
                         onClose();
                       }}
                       className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
@@ -131,11 +156,24 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
                             <p className="text-[10px] font-mono text-[#656860]">{doc.sizeFormatted} • {doc.date}</p>
                           </div>
                         </div>
-                        {isActive ? (
-                          <span className="w-2 h-2 rounded-full bg-[#C25E00] shrink-0"></span>
-                        ) : (
-                          <Check className="w-3 h-3 text-emerald-600 shrink-0" />
-                        )}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteDocument(doc);
+                              onClose();
+                            }}
+                            className="p-1 rounded text-[#656860] hover:text-[#9D0208] hover:bg-[#FEE2E2]"
+                            aria-label={`Delete ${doc.name}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                          {isActive ? (
+                            <span className="w-2 h-2 rounded-full bg-[#C25E00]"></span>
+                          ) : (
+                            <Check className="w-3 h-3 text-emerald-600" />
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -149,7 +187,7 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
                   className="w-full py-2 bg-[#EFEAE1] hover:bg-[#EAE4D8] border border-[#E2E0D8] rounded-lg text-xs font-bold text-[#1C1D1B] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Add Document</span>
+                  <span>Add Document</span>
                 </button>
               </div>
 
@@ -159,10 +197,12 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
                   <ShieldCheck className="w-3.5 h-3.5 text-[#C25E00]" />
                   <span>Strict Grounding</span>
                 </div>
-                <div className="flex justify-between font-mono text-xs">
-                  <span>Confidence: <strong className="text-[#1C1D1B]">99.8%</strong></span>
-                  <span>Risk: <strong className="text-emerald-700">0%</strong></span>
-                </div>
+                {minSimilarityPercent != null && retrievalK != null && (
+                  <div className="flex justify-between font-mono text-xs">
+                    <span>Min. similarity: <strong className="text-[#1C1D1B]">{minSimilarityPercent}%</strong></span>
+                    <span>Top-k: <strong className="text-emerald-700">{retrievalK}</strong></span>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -236,7 +276,7 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
           <div className="p-2.5 bg-[#EFECE6] border border-[#E2E0D8] rounded-lg flex items-center justify-between text-xs">
             <div>
               <p className="font-semibold text-[#1C1D1B]">Corpus Index</p>
-              <p className="text-[10.5px] font-mono text-[#656860]">1,816 chunks verified</p>
+              <p className="text-[10.5px] font-mono text-[#656860]">{totalChunks.toLocaleString()} chunks indexed</p>
             </div>
             <ShieldCheck className="w-4 h-4 text-emerald-700" />
           </div>

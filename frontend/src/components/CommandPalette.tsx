@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Search, FileText, Upload, Sparkles, X, BookOpen, ShieldCheck } from 'lucide-react';
+import { Search, FileText, Upload, Sparkles, X, BookOpen } from 'lucide-react';
+import { DocumentItem } from '../types';
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectAction: (action: string) => void;
+  documents: DocumentItem[];
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
   isOpen,
   onClose,
   onSelectAction,
+  documents,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -38,26 +41,26 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     {
       id: 'upload',
       title: 'Upload Document (PDF, MD, TXT)',
-      desc: 'Index a new file for semantic citation',
+      desc: 'Index a new file so you can ask questions about it',
       icon: <Upload className="w-4 h-4 text-[#C25E00]" />,
     },
     {
-      id: 'sample-scientific',
-      title: 'Load Sample: Attention Is All You Need (Vaswani et al.)',
-      desc: 'Scientific paper with 42 citations',
-      icon: <FileText className="w-4 h-4 text-[#C25E00]" />,
+      id: 'scope-all',
+      title: 'Ask across all documents',
+      desc: 'Search every indexed document',
+      icon: <BookOpen className="w-4 h-4 text-[#C25E00]" />,
     },
-    {
-      id: 'sample-legal',
-      title: 'Load Sample: Master Services Agreement v3.4',
-      desc: 'Legal brief with clause annotations',
+    ...documents.map((doc) => ({
+      id: `scope:${doc.id}`,
+      title: `Ask about ${doc.name}`,
+      desc: `${doc.chunkCount.toLocaleString()} chunks • ${doc.sizeFormatted}`,
       icon: <FileText className="w-4 h-4 text-[#C25E00]" />,
-    },
+    })),
     {
-      id: 'verify-grounding',
-      title: 'Verify Grounding Confidence Invariant',
-      desc: 'Audit chunk vector index integrity',
-      icon: <ShieldCheck className="w-4 h-4 text-[#C25E00]" />,
+      id: 'clear-chat',
+      title: 'Clear conversation',
+      desc: 'Start a fresh research thread',
+      icon: <Sparkles className="w-4 h-4 text-[#C25E00]" />,
     },
   ];
 
