@@ -259,3 +259,13 @@ def test_ask_passes_the_document_filter(client, monkeypatch):
     calls = patch_ask(monkeypatch, [rc(0)])
     client.post("/ask", json={"question": "What is X?", "doc_id": doc_id})
     assert calls["retrieve"][0]["doc"] == doc_id
+
+def test_config_exposes_upload_rules(client):
+    body = client.get("/config").json()
+    assert body["allowed_extensions"] == [".md", ".pdf", ".txt"]
+    assert body["max_file_size_mb"] == 10
+
+
+def test_cors_allows_the_dev_frontend(client):
+    r = client.get("/health", headers={"Origin": "http://localhost:3000"})
+    assert r.headers["access-control-allow-origin"] == "http://localhost:3000"

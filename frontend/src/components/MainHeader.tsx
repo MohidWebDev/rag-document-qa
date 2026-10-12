@@ -13,18 +13,20 @@ import {
 import { DocumentItem } from '../types';
 
 interface MainHeaderProps {
-  currentScope: string;
-  onScopeChange: (scope: string) => void;
+  /** Selected doc_id, or null for all documents */
+  currentScopeId: string | null;
+  onScopeChange: (docId: string | null) => void;
   documents: DocumentItem[];
   onOpenCommandPalette: () => void;
   onOpenUserModal?: () => void;
   onRefresh?: () => void;
   onShare?: () => void;
   onToggleMobileDrawer?: () => void;
+  isOnline?: boolean;
 }
 
 export const MainHeader: React.FC<MainHeaderProps> = ({
-  currentScope,
+  currentScopeId,
   onScopeChange,
   documents,
   onOpenCommandPalette,
@@ -32,8 +34,13 @@ export const MainHeader: React.FC<MainHeaderProps> = ({
   onRefresh,
   onShare,
   onToggleMobileDrawer,
+  isOnline = true,
 }) => {
   const [scopeDropdownOpen, setScopeDropdownOpen] = useState(false);
+  const currentScope =
+    currentScopeId === null
+      ? 'All Documents'
+      : documents.find((d) => d.id === currentScopeId)?.name ?? 'All Documents';
 
   return (
     <header className="w-full bg-[#FFFFFF] border-b border-[#E2E0D8] select-none">
@@ -66,10 +73,10 @@ export const MainHeader: React.FC<MainHeaderProps> = ({
 
         {/* Right Status & Profile */}
         <div className="flex items-center gap-2 sm:gap-4">
-          {/* Auto-cite Active status */}
+          {/* Backend connection status */}
           <div className="flex items-center gap-1.5 text-xs text-[#1C1D1B] font-medium">
-            <Radio className="w-3.5 h-3.5 text-[#C25E00]" />
-            <span className="hidden md:inline">Auto-cite Active</span>
+            <Radio className={`w-3.5 h-3.5 ${isOnline ? 'text-[#C25E00]' : 'text-[#9D0208]'}`} />
+            <span className="hidden md:inline">{isOnline ? 'Server connected' : 'Server offline'}</span>
           </div>
 
           {/* User Avatar */}
@@ -109,13 +116,13 @@ export const MainHeader: React.FC<MainHeaderProps> = ({
                 </div>
                 <button
                   onClick={() => {
-                    onScopeChange('All Documents');
+                    onScopeChange(null);
                     setScopeDropdownOpen(false);
                   }}
                   className="w-full px-3 py-1.5 text-xs flex items-center justify-between hover:bg-[#F8F6F0] text-left text-[#1C1D1B]"
                 >
                   <span>All Indexed Documents</span>
-                  {currentScope === 'All Documents' && (
+                  {currentScopeId === null && (
                     <Check className="w-3.5 h-3.5 text-[#C25E00]" />
                   )}
                 </button>
@@ -123,13 +130,13 @@ export const MainHeader: React.FC<MainHeaderProps> = ({
                   <button
                     key={doc.id}
                     onClick={() => {
-                      onScopeChange(doc.name);
+                      onScopeChange(doc.id);
                       setScopeDropdownOpen(false);
                     }}
                     className="w-full px-3 py-1.5 text-xs flex items-center justify-between hover:bg-[#F8F6F0] text-left text-[#1C1D1B]"
                   >
                     <span className="truncate">{doc.name}</span>
-                    {currentScope === doc.name && (
+                    {currentScopeId === doc.id && (
                       <Check className="w-3.5 h-3.5 text-[#C25E00]" />
                     )}
                   </button>
@@ -167,7 +174,7 @@ export const MainHeader: React.FC<MainHeaderProps> = ({
           <button
             onClick={onRefresh}
             className="p-1.5 rounded text-[#656860] hover:text-[#1C1D1B] hover:bg-[#EFECE6] transition-colors cursor-pointer"
-            title="Reset or refresh synthesis"
+            title="Clear conversation and reload documents"
           >
             <RotateCw className="w-3.5 h-3.5" />
           </button>

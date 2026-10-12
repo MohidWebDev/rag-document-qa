@@ -6,24 +6,43 @@ import {
   XCircle,
   Lock,
   RefreshCw,
-  ExternalLink,
   X,
-  FileText
+  WifiOff,
 } from 'lucide-react';
+import { UploadItem, formatBytes } from '../types';
 
 interface UploadFeedbackGalleryProps {
-  onDismissItem?: (id: string) => void;
-  onViewExisting?: (docName: string) => void;
+  items: UploadItem[];
+  allowedExtensions: string[];
+  maxFileSizeMb: number;
+  onChooseFiles: () => void;
+  onDropFiles: (files: File[]) => void;
+  onDismissItem: (id: string) => void;
+  onViewExisting: (docId: string) => void;
+  onClose?: () => void;
 }
 
+const DismissButton: React.FC<{ onClick: () => void; className: string }> = ({ onClick, className }) => (
+  <button onClick={onClick} className={`p-0.5 rounded shrink-0 cursor-pointer ${className}`} title="Dismiss" aria-label="Dismiss">
+    <X className="w-3 h-3" />
+  </button>
+);
+
 export const UploadFeedbackGallery: React.FC<UploadFeedbackGalleryProps> = ({
+  items,
+  allowedExtensions,
+  maxFileSizeMb,
+  onChooseFiles,
+  onDropFiles,
   onDismissItem,
   onViewExisting,
+  onClose,
 }) => {
-  const [progressPercent, setProgressPercent] = useState(60);
+  const [isDragging, setIsDragging] = useState(false);
+  const formats = allowedExtensions.map((e) => e.replace('.', '').toUpperCase()).join(', ');
 
   return (
-    <div className="w-full max-w-sm sm:w-[350px] bg-[#FFFFFF] rounded-2xl border border-[#E2E0D8] p-4 shadow-xl space-y-3.5 select-none animate-in fade-in zoom-in-95 duration-150">
+    <div className="w-full bg-[#FFFFFF] rounded-2xl border border-[#E2E0D8] p-4 shadow-xl space-y-3.5 select-none animate-in fade-in zoom-in-95 duration-150">
       {/* Card Header */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
@@ -31,130 +50,193 @@ export const UploadFeedbackGallery: React.FC<UploadFeedbackGalleryProps> = ({
             <div className="w-6 h-6 rounded-md bg-[#FAF0E6] text-[#C25E00] flex items-center justify-center">
               <UploadCloud className="w-3.5 h-3.5" />
             </div>
-            <h3 className="text-sm font-bold text-[#1C1D1B]">
-              Upload Feedback
-            </h3>
+            <h3 className="text-sm font-bold text-[#1C1D1B]">Upload Documents</h3>
           </div>
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-[#FAF8F5] border border-[#E2E0D8] text-[#656860] font-semibold">
-            Live Pipeline
-          </span>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md text-[#656860] hover:text-[#1C1D1B] hover:bg-[#F8F6F0] cursor-pointer"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
         <p className="text-[11px] text-[#656860] leading-snug">
-          Corpus ingestion statuses and error feedback handlers for document uploads.
+          {formats} files up to {maxFileSizeMb} MB. Each file is parsed, chunked and embedded so you can ask
+          questions about it.
         </p>
       </div>
 
-      {/* Stacked Feedback Items */}
-      <div className="space-y-2.5">
-        {/* 1. IN-PROGRESS FILE ROW */}
-        <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#E2E0D8] space-y-2">
-          {/* File and % Header */}
-          <div className="flex items-center justify-between font-mono text-xs">
-            <div className="flex items-center gap-1.5 font-bold text-[#1C1D1B] truncate max-w-[200px]">
-              <RefreshCw className="w-3.5 h-3.5 text-[#C25E00] animate-spin shrink-0" />
-              <span className="truncate">annual_audit.pdf</span>
-            </div>
-            <span className="font-bold text-[#C25E00] text-[11px]">{progressPercent}%</span>
-          </div>
-
-          {/* Progress Bar Track */}
-          <div className="w-full bg-[#E2E0D8] h-1.5 rounded-full overflow-hidden">
-            <div
-              className="bg-[#C25E00] h-full rounded-full transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
-            ></div>
-          </div>
-
-          {/* Status Row */}
-          <div className="flex items-center justify-between font-mono text-[10.5px]">
-            <span className="flex items-center gap-1 text-[#1C1D1B]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#C25E00] animate-pulse"></span>
-              Processing your document...
-            </span>
-            <span className="text-[#656860]">3.2 MB / 5.4 MB</span>
-          </div>
-
-          {/* Subtext */}
-          <p className="font-mono text-[10px] text-[#656860] pt-0.5">
-            Chunking &amp; generating embeddings
-          </p>
-        </div>
-
-        {/* 2. SUCCESS TOAST */}
-        <div className="p-3 bg-[#F0FDF4] rounded-xl border border-[#BBF7D0] space-y-1 text-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 font-medium text-[#2D6A4F]">
-              <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
-              <span className="font-sans font-semibold">
-                Uploaded <code className="font-mono font-bold">research_paper.pdf</code>
-              </span>
-            </div>
-            <span className="font-mono text-[9.5px] px-1.5 py-0.5 rounded bg-[#DCFCE7] text-[#166534] font-bold border border-[#BBF7D0]">
-              Index ready
-            </span>
-          </div>
-          <p className="font-mono text-[10.5px] text-[#2D6A4F]/80 pl-6">
-            18 pages • 84 citations cataloged
-          </p>
-        </div>
-
-        {/* 3. WARNING TOAST */}
-        <div className="p-3 bg-[#FFFBEB] rounded-xl border border-[#FDE68A] space-y-1 text-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-[#B57614]">
-              <AlertTriangle className="w-4 h-4 text-[#B57614] shrink-0" />
-              <span className="font-medium">
-                File <code className="font-mono font-bold">meeting_notes.md</code> was already uploaded.
-              </span>
-            </div>
-            <button
-              onClick={() => onViewExisting && onViewExisting('meeting_notes.md')}
-              className="font-mono text-[10px] text-[#B57614] hover:underline shrink-0 font-bold ml-1 cursor-pointer"
-            >
-              View existing
-            </button>
-          </div>
-          <p className="font-mono text-[10.5px] text-[#B57614]/80 pl-6 leading-tight">
-            Overwriting will regenerate 32 vector partitions
-          </p>
-        </div>
-
-        {/* 4. ERROR TOAST 1 (File size exceeds limit) */}
-        <div className="p-3 bg-[#FEF2F2] rounded-xl border border-[#FECACA] space-y-1 text-xs">
-          <div className="flex items-center justify-between text-[#9D0208]">
-            <div className="flex items-center gap-2 font-semibold">
-              <AlertTriangle className="w-4 h-4 text-[#9D0208] shrink-0" />
-              <span>File size exceeds 10 MB limit.</span>
-            </div>
-            <span className="font-mono text-[10.5px] font-bold">14.8 MB</span>
-          </div>
-          <p className="font-mono text-[10.5px] text-[#9D0208]/80 pl-6 leading-tight">
-            Compressed PDFs recommended for academic parsing.
-          </p>
-        </div>
-
-        {/* 5. ERROR TOAST 2 (Unsupported file format) */}
-        <div className="p-3 bg-[#FEF2F2] rounded-xl border border-[#FECACA] space-y-1 text-xs">
-          <div className="flex items-center gap-2 text-[#9D0208] font-semibold">
-            <XCircle className="w-4 h-4 text-[#9D0208] shrink-0" />
-            <span>Unsupported file format.</span>
-          </div>
-          <p className="font-mono text-[10.5px] text-[#9D0208]/80 pl-6 leading-tight">
-            Please upload PDF, MD, or TXT formats only.
-          </p>
-        </div>
-
-        {/* 6. ERROR TOAST 3 (Could not read file) */}
-        <div className="p-3 bg-[#FEF2F2] rounded-xl border border-[#FECACA] space-y-1 text-xs">
-          <div className="flex items-center gap-2 text-[#9D0208] font-semibold">
-            <Lock className="w-4 h-4 text-[#9D0208] shrink-0" />
-            <span>Could not read file.</span>
-          </div>
-          <p className="font-mono text-[10.5px] text-[#9D0208]/80 pl-6 leading-relaxed">
-            Scanned or password-protected PDFs are not supported. Run OCR or remove encryption prior to ingest.
-          </p>
-        </div>
+      {/* Drop zone */}
+      <div
+        onClick={onChooseFiles}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragging(false);
+          const files = Array.from(e.dataTransfer.files ?? []);
+          if (files.length) onDropFiles(files);
+        }}
+        className={`p-5 rounded-xl border-2 border-dashed text-center cursor-pointer transition-colors ${
+          isDragging ? 'border-[#C25E00] bg-[#FAF0E6]' : 'border-[#E2E0D8] bg-[#FAF8F5] hover:border-[#C25E00]/60'
+        }`}
+      >
+        <UploadCloud className="w-6 h-6 text-[#C25E00] mx-auto mb-1.5" />
+        <p className="text-xs font-bold text-[#1C1D1B]">Drop files here or click to browse</p>
+        <p className="text-[10.5px] font-mono text-[#656860] mt-0.5">{allowedExtensions.join(' · ')}</p>
       </div>
+
+      {/* Upload status rows, newest first */}
+      {items.length > 0 && (
+        <div className="space-y-2.5 max-h-[45vh] overflow-y-auto">
+          {items.map((item) => {
+            if (item.status === 'uploading' || item.status === 'processing') {
+              const percent = Math.round(item.progress * 100);
+              return (
+                <div key={item.id} className="p-3 bg-[#FAF8F5] rounded-xl border border-[#E2E0D8] space-y-2">
+                  <div className="flex items-center justify-between font-mono text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-[#1C1D1B] min-w-0">
+                      <RefreshCw className="w-3.5 h-3.5 text-[#C25E00] animate-spin shrink-0" />
+                      <span className="truncate">{item.fileName}</span>
+                    </div>
+                    <span className="font-bold text-[#C25E00] text-[11px] shrink-0 ml-2">
+                      {item.status === 'uploading' ? `${percent}%` : 'Indexing'}
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-[#E2E0D8] h-1.5 rounded-full overflow-hidden">
+                    {item.status === 'uploading' ? (
+                      <div
+                        className="bg-[#C25E00] h-full rounded-full transition-all duration-300"
+                        style={{ width: `${percent}%` }}
+                      ></div>
+                    ) : (
+                      <div className="bg-[#C25E00] h-full w-full rounded-full animate-pulse"></div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between font-mono text-[10.5px]">
+                    <span className="flex items-center gap-1 text-[#1C1D1B]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#C25E00] animate-pulse"></span>
+                      {item.status === 'uploading' ? 'Uploading...' : 'Processing your document...'}
+                    </span>
+                    <span className="text-[#656860]">{formatBytes(item.bytes)}</span>
+                  </div>
+
+                  {item.status === 'processing' && (
+                    <p className="font-mono text-[10px] text-[#656860] pt-0.5">Chunking &amp; generating embeddings</p>
+                  )}
+                </div>
+              );
+            }
+
+            if (item.status === 'success') {
+              return (
+                <div key={item.id} className="p-3 bg-[#F0FDF4] rounded-xl border border-[#BBF7D0] space-y-1 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 font-medium text-[#2D6A4F] min-w-0">
+                      <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
+                      <span className="font-sans font-semibold truncate">
+                        Uploaded <code className="font-mono font-bold">{item.fileName}</code>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="font-mono text-[9.5px] px-1.5 py-0.5 rounded bg-[#DCFCE7] text-[#166534] font-bold border border-[#BBF7D0]">
+                        Index ready
+                      </span>
+                      <DismissButton onClick={() => onDismissItem(item.id)} className="text-[#2D6A4F] hover:bg-[#DCFCE7]" />
+                    </div>
+                  </div>
+                  <p className="font-mono text-[10.5px] text-[#2D6A4F]/80 pl-6">
+                    {item.segmentCount} {item.fileName.toLowerCase().endsWith('.pdf') ? 'pages' : 'sections'} •{' '}
+                    {item.chunkCount} chunks indexed
+                  </p>
+                </div>
+              );
+            }
+
+            if (item.status === 'duplicate') {
+              return (
+                <div key={item.id} className="p-3 bg-[#FFFBEB] rounded-xl border border-[#FDE68A] space-y-1 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-[#B57614] min-w-0">
+                      <AlertTriangle className="w-4 h-4 text-[#B57614] shrink-0" />
+                      <span className="font-medium">
+                        File <code className="font-mono font-bold break-all">{item.fileName}</code> was already
+                        uploaded.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {item.docId && (
+                        <button
+                          onClick={() => onViewExisting(item.docId!)}
+                          className="font-mono text-[10px] text-[#B57614] hover:underline font-bold ml-1 cursor-pointer"
+                        >
+                          View existing
+                        </button>
+                      )}
+                      <DismissButton onClick={() => onDismissItem(item.id)} className="text-[#B57614] hover:bg-[#FEF3C7]" />
+                    </div>
+                  </div>
+                  {item.existingName && item.existingName !== item.fileName && (
+                    <p className="font-mono text-[10.5px] text-[#B57614]/80 pl-6 leading-tight">
+                      Same content as <code>{item.existingName}</code>
+                    </p>
+                  )}
+                </div>
+              );
+            }
+
+            // Errors
+            const Icon =
+              item.errorKind === 'unsupported'
+                ? XCircle
+                : item.errorKind === 'unreadable'
+                  ? Lock
+                  : item.errorKind === 'offline'
+                    ? WifiOff
+                    : AlertTriangle;
+            const title =
+              item.errorKind === 'too-large'
+                ? `File size exceeds ${maxFileSizeMb} MB limit.`
+                : item.errorKind === 'unsupported'
+                  ? 'Unsupported file format.'
+                  : item.errorKind === 'unreadable'
+                    ? 'Could not read file.'
+                    : `Could not upload ${item.fileName}.`;
+            return (
+              <div key={item.id} className="p-3 bg-[#FEF2F2] rounded-xl border border-[#FECACA] space-y-1 text-xs">
+                <div className="flex items-center justify-between gap-2 text-[#9D0208]">
+                  <div className="flex items-center gap-2 font-semibold min-w-0">
+                    <Icon className="w-4 h-4 text-[#9D0208] shrink-0" />
+                    <span className="truncate">{title}</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {item.errorKind === 'too-large' && (
+                      <span className="font-mono text-[10.5px] font-bold">{formatBytes(item.bytes)}</span>
+                    )}
+                    <DismissButton onClick={() => onDismissItem(item.id)} className="text-[#9D0208] hover:bg-[#FEE2E2]" />
+                  </div>
+                </div>
+                <p className="font-mono text-[10.5px] text-[#9D0208]/80 pl-6 leading-relaxed break-words">
+                  {item.errorKind === 'too-large' || item.errorKind === 'unsupported' ? (
+                    <>
+                      <span className="text-[#1C1D1B]/70">{item.fileName}</span> — {item.message}
+                    </>
+                  ) : (
+                    item.message
+                  )}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

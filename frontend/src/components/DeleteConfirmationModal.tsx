@@ -15,6 +15,8 @@ interface DeleteConfirmationModalProps {
   documentName?: string;
   embeddingsCount?: number;
   citationsCount?: number;
+  isDeleting?: boolean;
+  errorMessage?: string | null;
 }
 
 export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
@@ -24,6 +26,8 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
   documentName = 'Q3_Financial_Report.pdf',
   embeddingsCount = 1420,
   citationsCount = 14,
+  isDeleting = false,
+  errorMessage = null,
 }) => {
   if (!isOpen) return null;
 
@@ -31,7 +35,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Dimmed backdrop */}
       <div
-        onClick={onClose}
+        onClick={isDeleting ? undefined : onClose}
         className="absolute inset-0 bg-black/45 backdrop-blur-xs transition-opacity"
       ></div>
 
@@ -120,10 +124,17 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
           <div className="flex items-start gap-1.5 text-[11px] font-mono text-[#656860] pt-1">
             <Info className="w-3.5 h-3.5 shrink-0 text-[#656860] mt-0.5" />
             <p className="leading-snug">
-              Workspace synthetic answers citing this source will maintain historical text with a severed citation flag.
+              Answers already in this conversation keep their text, but their citations to this document can no longer be opened.
             </p>
           </div>
         </div>
+
+        {errorMessage && (
+          <div className="p-3 bg-[#FEF2F2] rounded-lg border border-[#FECACA] text-xs text-[#9D0208] flex items-start gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex items-center justify-end gap-3 pt-2">
@@ -131,6 +142,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
           <button
             type="button"
             onClick={onClose}
+            disabled={isDeleting}
             className="px-4 py-2 rounded-xl border border-[#E2E0D8] bg-[#FFFFFF] hover:bg-[#FAF8F5] text-xs sm:text-sm font-semibold text-[#1C1D1B] transition-colors cursor-pointer"
           >
             Cancel
@@ -140,10 +152,11 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
           <button
             type="button"
             onClick={onConfirmDelete}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#9D0208] hover:bg-[#800206] active:scale-95 text-xs sm:text-sm font-semibold text-white shadow-xs transition-all cursor-pointer"
+            disabled={isDeleting}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#9D0208] hover:bg-[#800206] active:scale-95 text-xs sm:text-sm font-semibold text-white shadow-xs transition-all cursor-pointer disabled:opacity-70 disabled:cursor-wait"
           >
             <Trash2 className="w-4 h-4" />
-            <span>Delete Document</span>
+            <span>{isDeleting ? 'Deleting...' : errorMessage ? 'Try Again' : 'Delete Document'}</span>
           </button>
         </div>
       </div>

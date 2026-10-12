@@ -12,10 +12,15 @@ import { PromptArchetype } from '../types';
 interface EmptyStateHeroProps {
   onSelectPrompt: (promptText: string) => void;
   onTriggerUploadClick?: () => void;
+  hasDocuments?: boolean;
+  scopeLabel?: string;
 }
 
 export const EmptyStateHero: React.FC<EmptyStateHeroProps> = ({
   onSelectPrompt,
+  onTriggerUploadClick,
+  hasDocuments = false,
+  scopeLabel = 'All Documents',
 }) => {
   const examplePrompts: { id: string; text: string; icon: React.ReactNode }[] = [
     {
@@ -98,7 +103,7 @@ export const EmptyStateHero: React.FC<EmptyStateHeroProps> = ({
 
       {/* 2. Main Title */}
       <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1C1D1B] max-w-xl">
-        Upload a document to get started
+        {hasDocuments ? 'Ask a question about your documents' : 'Upload a document to get started'}
       </h1>
 
       {/* 3. Subtitle */}
@@ -120,10 +125,21 @@ export const EmptyStateHero: React.FC<EmptyStateHeroProps> = ({
         <span>Zero Hallucination Mode</span>
       </div>
 
+      {!hasDocuments && onTriggerUploadClick && (
+        <button
+          onClick={onTriggerUploadClick}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#8A3E00] hover:bg-[#723200] text-white text-sm font-semibold shadow-xs cursor-pointer mb-7"
+        >
+          <FileText className="w-4 h-4" />
+          Upload a PDF, Markdown or text file
+        </button>
+      )}
+
       {/* 5. Prompt Archetypes Section */}
+      {hasDocuments && (
       <div className="w-full max-w-xl">
         <p className="text-[10px] font-mono uppercase tracking-wider text-[#656860] mb-3">
-          COMMON RETRIEVAL ARCHETYPES
+          TRY ASKING ({scopeLabel})
         </p>
 
         {/* 3 Clickable Example Prompt Chips */}
@@ -155,6 +171,7 @@ export const EmptyStateHero: React.FC<EmptyStateHeroProps> = ({
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 };
