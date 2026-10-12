@@ -115,7 +115,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, init);
-  } catch {
+  } catch (e) {
+    // A request we cancelled ourselves (Stop button) is not a network problem
+    if (e instanceof DOMException && e.name === 'AbortError') throw e;
     throw new ApiError(0, 'Cannot reach the server. Is the backend running?');
   }
 

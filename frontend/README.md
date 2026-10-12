@@ -38,6 +38,10 @@ cross-origin request.
 
 All calls go through [`src/api.ts`](src/api.ts).
 
+Chats are saved in the browser's `localStorage` ([`src/chatStore.ts`](src/chatStore.ts)), not on
+the server: they survive a page refresh but stay in that one browser, and clearing site data
+removes them. The newest 50 chats are kept.
+
 ## Deploying
 
 `npm run build` writes static files to `dist/`. Either serve them behind a reverse proxy

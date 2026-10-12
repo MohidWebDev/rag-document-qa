@@ -18,7 +18,7 @@ export interface ViewerTarget {
   citation?: SourceCitation;
 }
 
-export type ChatStatus = 'loading' | 'answered' | 'not-found' | 'error';
+export type ChatStatus = 'loading' | 'answered' | 'not-found' | 'error' | 'stopped';
 
 export interface ChatMessage {
   id: string;
@@ -34,6 +34,15 @@ export interface ChatMessage {
   /** The scope the question was asked in: a doc_id, or null for all documents */
   scopeDocId?: string | null;
   scopeLabel?: string;
+}
+
+/** One saved chat. Kept in the browser's localStorage (see chatStore.ts). */
+export interface Conversation {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: ChatMessage[];
 }
 
 export interface DocumentItem {

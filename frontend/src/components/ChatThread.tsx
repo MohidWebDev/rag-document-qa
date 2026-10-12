@@ -11,8 +11,10 @@ import {
   Search,
   AlertTriangle,
   RotateCw,
+  Square,
 } from 'lucide-react';
 import { ChatMessage, SourceCitation, locationLabel } from '../types';
+import { AnswerMarkdown } from './AnswerMarkdown';
 
 interface ChatThreadProps {
   messages: ChatMessage[];
@@ -21,43 +23,6 @@ interface ChatThreadProps {
   onRetry: (message: ChatMessage) => void;
   onUploadClick: () => void;
   onSearchAllDocuments: (message: ChatMessage) => void;
-}
-
-/** Render **bold** and [n] citation markers inside one line of answer text. */
-function renderInline(
-  text: string,
-  citationIds: Set<number>,
-  onCite: (id: number) => void,
-  keyPrefix: string,
-): React.ReactNode[] {
-  const parts = text.split(/(\[\d+\]|\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    const key = `${keyPrefix}-${i}`;
-    const cite = part.match(/^\[(\d+)\]$/);
-    if (cite) {
-      const id = Number(cite[1]);
-      if (!citationIds.has(id)) return <span key={key}>{part}</span>;
-      return (
-        <button
-          key={key}
-          onClick={() => onCite(id)}
-          className="inline-flex items-center justify-center font-mono font-bold text-xs text-[#8A4A00] bg-[#FAF3EA] border border-[#8A4A00] px-1.5 py-0.2 rounded hover:bg-[#8A4A00] hover:text-white transition-colors cursor-pointer mx-0.5 shadow-2xs"
-          title={`View source citation [${id}]`}
-        >
-          [{id}]
-        </button>
-      );
-    }
-    const bold = part.match(/^\*\*([^*]+)\*\*$/);
-    if (bold) {
-      return (
-        <strong key={key} className="font-bold text-[#C25E00]">
-          {bold[1]}
-        </strong>
-      );
-    }
-    return <React.Fragment key={key}>{part}</React.Fragment>;
-  });
 }
 
 const UserBubble: React.FC<{ message: ChatMessage }> = ({ message }) => (
@@ -100,6 +65,8 @@ const AssistantMessage: React.FC<{
   const [highlightedCitationId, setHighlightedCitationId] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  // A retry turns the message back into 'loading'; once it settles again, the button is usable again
+  useEffect(() => setRetrying(false), [message.status]);
 
   const citations = message.citations ?? [];
   const citationIds = new Set(citations.map((c) => c.id));
@@ -189,6 +156,24 @@ const AssistantMessage: React.FC<{
     );
   }
 
+  if (message.status === 'stopped') {
+    return (
+      <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#E2E0D8] flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-xs text-[#656860]">
+          <Square className="w-3 h-3 fill-current" />
+          {message.content || 'You stopped this answer.'}
+        </span>
+        <button
+          onClick={() => props.onRetry(message)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-[#E2E0D8] bg-white text-[#1C1D1B] hover:border-[#C25E00] hover:text-[#C25E00] text-xs font-medium transition-colors cursor-pointer"
+        >
+          <RotateCw className="w-3.5 h-3.5" />
+          Ask again
+        </button>
+      </div>
+    );
+  }
+
   if (message.status === 'error') {
     return (
       <div className="p-4 bg-[#FFFBFB] rounded-xl border border-[#FCA5A5] space-y-3">
@@ -220,20 +205,13 @@ const AssistantMessage: React.FC<{
   }
 
   // Answered
-  const paragraphs = message.content.split(/\n{2,}/);
 
   return (
     <div className="space-y-3.5">
       <AssistantHeader message={message} badge={`Searched: ${message.scopeLabel}`} />
 
       <div className="bg-[#FFFFFF] border border-[#E2E0D8] rounded-xl p-5 shadow-xs space-y-4">
-        <div className="space-y-3">
-          {paragraphs.map((para, i) => (
-            <p key={i} className="text-sm text-[#1C1D1B] leading-relaxed whitespace-pre-line break-words">
-              {renderInline(para, citationIds, scrollToCitation, `${message.id}-${i}`)}
-            </p>
-          ))}
-        </div>
+        <AnswerMarkdown content={message.content} citationIds={citationIds} onCite={scrollToCitation} />
 
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#E2E0D8]/70 text-xs text-[#656860]">
           <div className="flex items-center gap-4">

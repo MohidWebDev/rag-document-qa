@@ -15,6 +15,8 @@ interface MobileDrawerProps {
   onOpenDocument: (doc: DocumentItem) => void;
   onDeleteDocument: (doc: DocumentItem) => void;
   onOpenSettings: () => void;
+  /** The chat list; rendered below the documents */
+  chatList?: (closeDrawer: () => void) => React.ReactNode;
 }
 
 /** Below the lg breakpoint the documents panel is hidden; this drawer shows the same list. */
@@ -29,6 +31,7 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
   onOpenDocument,
   onDeleteDocument,
   onOpenSettings,
+  chatList,
 }) => {
   if (!isOpen) return null;
 
@@ -73,6 +76,8 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
             onOpenDocument={then(onOpenDocument)}
             onDeleteDocument={then(onDeleteDocument)}
           />
+
+          {chatList && <div className="pt-4 border-t border-[#E2E0D8]">{chatList(onClose)}</div>}
         </div>
 
         <div className="pt-3 border-t border-[#E2E0D8] mt-4">

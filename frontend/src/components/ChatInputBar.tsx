@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Paperclip, ArrowUp, Info, Loader2 } from 'lucide-react';
+import { Paperclip, ArrowUp, Info, Square } from 'lucide-react';
 
 /** Matches AskRequest.question max_length in backend/main.py */
 const MAX_QUESTION_LENGTH = 1000;
@@ -9,6 +9,8 @@ interface ChatInputBarProps {
   /** An answer is on its way: typing is allowed, sending is not */
   isBusy?: boolean;
   onSendMessage?: (message: string) => void;
+  /** Shown as a Stop button while isBusy */
+  onStop?: () => void;
   onAttachClick?: () => void;
   placeholder?: string;
 }
@@ -17,6 +19,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
   isDisabled = false,
   isBusy = false,
   onSendMessage,
+  onStop,
   onAttachClick,
   placeholder = 'Ask a question about this document or synthesized corpus...',
 }) => {
@@ -71,20 +74,32 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                   : 'Press Enter to send'}
               </span>
 
-              {/* Send Button */}
-              <button
-                type="submit"
-                disabled={isDisabled || isBusy || !inputText.trim()}
-                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                  inputText.trim() && !isBusy && !isDisabled
-                    ? 'bg-[#8A3E00] text-white hover:bg-[#723200] cursor-pointer shadow-xs'
-                    : 'bg-[#8A3E00] text-white cursor-not-allowed opacity-60'
-                }`}
-                title={isBusy ? 'Waiting for the answer...' : 'Send question'}
-                aria-label="Send question"
-              >
-                {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4 stroke-[2.4]" />}
-              </button>
+              {/* Send, or Stop while an answer is loading */}
+              {isBusy && onStop ? (
+                <button
+                  type="button"
+                  onClick={onStop}
+                  className="w-7 h-7 rounded-full flex items-center justify-center bg-[#1C1D1B] text-white hover:bg-[#3A3B38] cursor-pointer shadow-xs transition-all"
+                  title="Stop generating"
+                  aria-label="Stop generating"
+                >
+                  <Square className="w-3 h-3 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isDisabled || isBusy || !inputText.trim()}
+                  className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                    inputText.trim() && !isBusy && !isDisabled
+                      ? 'bg-[#8A3E00] text-white hover:bg-[#723200] cursor-pointer shadow-xs'
+                      : 'bg-[#8A3E00] text-white cursor-not-allowed opacity-60'
+                  }`}
+                  title="Send question"
+                  aria-label="Send question"
+                >
+                  <ArrowUp className="w-4 h-4 stroke-[2.4]" />
+                </button>
+              )}
             </div>
           </div>
         </div>

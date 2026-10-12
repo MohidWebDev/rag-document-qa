@@ -117,7 +117,11 @@ export const DocumentList: React.FC<TargetCorpusPanelProps> = ({
   );
 };
 
-export const TargetCorpusPanel: React.FC<TargetCorpusPanelProps> = (props) => (
+/** Left column (lg and up): documents on top, then anything passed as children (the chat list). */
+export const TargetCorpusPanel: React.FC<TargetCorpusPanelProps & { children?: React.ReactNode }> = ({
+  children,
+  ...props
+}) => (
   <aside className="hidden lg:flex w-[280px] shrink-0 h-full bg-[#F8F6F0] border-r border-[#E2E0D8] p-3 flex-col select-none overflow-y-auto">
     <div className="space-y-1.5 mb-3">
       <div className="flex items-center justify-between">
@@ -134,5 +138,6 @@ export const TargetCorpusPanel: React.FC<TargetCorpusPanelProps> = (props) => (
       </p>
     </div>
     <DocumentList {...props} />
+    {children && <div className="mt-5 pt-4 border-t border-[#E2E0D8]">{children}</div>}
   </aside>
 );

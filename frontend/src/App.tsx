@@ -16,9 +16,12 @@ import { DocumentPageViewerModal } from './components/DocumentPageViewerModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { UploadFeedbackGallery } from './components/UploadFeedbackGallery';
 import { EmptyStateHero } from './components/EmptyStateHero';
+import { ChatHistoryList } from './components/ChatHistoryList';
 import { api, ApiConfig, ApiError } from './api';
+import { loadConversations, saveConversations, upsertConversation } from './chatStore';
 import {
   ChatMessage,
+  Conversation,
   DocumentItem,
   SourceCitation,
   UploadItem,
@@ -55,9 +58,13 @@ export default function App() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(true);
 
-  // Chat
+  // Chat. Saved chats come from localStorage; the most recent one reopens on load.
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>(loadConversations);
+  const [activeChatId, setActiveChatId] = useState<string>(() => conversations[0]?.id ?? newId('c'));
+  const [messages, setMessages] = useState<ChatMessage[]>(() => conversations[0]?.messages ?? []);
+  // One AbortController per answer that is still loading, so Stop can cancel it
+  const controllers = useRef(new Map<string, AbortController>());
 
   // Uploads
   const [uploads, setUploads] = useState<UploadItem[]>([]);
@@ -78,13 +85,13 @@ export default function App() {
   const closePalette = useCallback(() => setIsCommandPaletteOpen(false), []);
   const closeSettings = useCallback(() => setIsSettingsOpen(false), []);
   const closeViewer = useCallback(() => setViewerTarget(null), []);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; action?: { label: string; run: () => void } } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
+  const showToast = useCallback((message: string, action?: { label: string; run: () => void }) => {
+    setToast({ message, action });
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToastMessage(null), 3500);
+    toastTimer.current = setTimeout(() => setToast(null), action ? 6000 : 3500);
   }, []);
 
   const allowedExtensions = config?.allowed_extensions ?? DEFAULT_ALLOWED_EXTENSIONS;
@@ -143,11 +150,18 @@ export default function App() {
 
   const runAsk = useCallback(
     async (assistantId: string, question: string, docId: string | null) => {
+      // Only touch the message if it's still in the open chat (the user may have switched chats)
       const update = (patch: Partial<ChatMessage>) =>
-        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, ...patch } : m)));
+        setMessages((prev) =>
+          prev.some((m) => m.id === assistantId)
+            ? prev.map((m) => (m.id === assistantId ? { ...m, ...patch } : m))
+            : prev,
+        );
 
+      const controller = new AbortController();
+      controllers.current.set(assistantId, controller);
       try {
-        const res = await api.ask(question, docId);
+        const res = await api.ask(question, docId, controller.signal);
         update({
           status: res.answered ? 'answered' : 'not-found',
           content: res.answer,
@@ -155,6 +169,10 @@ export default function App() {
           timestamp: formatTime(),
         });
       } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') {
+          update({ status: 'stopped', content: '', timestamp: formatTime() });
+          return;
+        }
         noteError(e);
         let content = e instanceof Error ? e.message : 'Unknown error.';
         if (e instanceof ApiError && e.status === 404) {
@@ -162,6 +180,8 @@ export default function App() {
           void refreshDocuments().catch(() => {});
         }
         update({ status: 'error', content, timestamp: formatTime() });
+      } finally {
+        if (controllers.current.get(assistantId) === controller) controllers.current.delete(assistantId);
       }
     },
     [noteError, refreshDocuments],
@@ -203,6 +223,65 @@ export default function App() {
   };
 
   const isAnswering = messages.some((m) => m.status === 'loading');
+
+  /** Stop every answer that is still loading. The backend finishes its work, but the answer is discarded. */
+  const stopAnswering = () => controllers.current.forEach((c) => c.abort());
+
+  // ---------- Saved chats ----------
+
+  // Save the open chat whenever its messages change. Opening a saved chat reuses the stored
+  // array, so just viewing a chat doesn't move it to the top.
+  useEffect(() => {
+    if (messages.length === 0) return;
+    setConversations((prev) =>
+      prev.find((c) => c.id === activeChatId)?.messages === messages
+        ? prev
+        : upsertConversation(prev, activeChatId, messages),
+    );
+  }, [messages, activeChatId]);
+
+  useEffect(() => saveConversations(conversations), [conversations]);
+
+  /** Before leaving the open chat: cancel loading answers and save them as stopped. */
+  const leaveCurrentChat = () => {
+    stopAnswering();
+    if (messages.some((m) => m.status === 'loading')) {
+      const settled = messages.map((m) =>
+        m.status === 'loading' ? { ...m, status: 'stopped' as const, content: '' } : m,
+      );
+      setConversations((prev) => upsertConversation(prev, activeChatId, settled));
+    }
+  };
+
+  const startNewChat = () => {
+    leaveCurrentChat();
+    setActiveChatId(newId('c'));
+    setMessages([]);
+  };
+
+  const selectChat = (id: string) => {
+    if (id === activeChatId) return;
+    const chat = conversations.find((c) => c.id === id);
+    if (!chat) return;
+    leaveCurrentChat();
+    setActiveChatId(id);
+    setMessages(chat.messages);
+  };
+
+  const deleteChat = (id: string) => {
+    const chat = conversations.find((c) => c.id === id);
+    if (!chat) return;
+    if (id === activeChatId) {
+      stopAnswering();
+      setActiveChatId(newId('c'));
+      setMessages([]);
+    }
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    showToast(`Deleted “${chat.title}”.`, {
+      label: 'Undo',
+      run: () => setConversations((prev) => [chat, ...prev.filter((c) => c.id !== id)].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))),
+    });
+  };
 
   const handleSend = (question: string) => {
     if (documents.length === 0) {
@@ -320,9 +399,21 @@ export default function App() {
   const selectScope = (docId: string | null) => setActiveDocId(docId);
 
   const newChat = () => {
-    setMessages([]);
+    startNewChat();
     void refreshDocuments().catch(() => {});
   };
+
+  const chatList = (afterSelect?: () => void) => (
+    <ChatHistoryList
+      conversations={conversations}
+      activeId={activeChatId}
+      onSelect={(id) => {
+        selectChat(id);
+        afterSelect?.();
+      }}
+      onDelete={deleteChat}
+    />
+  );
 
   const openDocument = (doc: DocumentItem) => setViewerTarget({ docId: doc.id, docName: doc.name });
   const openCitation = (citation: SourceCitation) =>
@@ -394,7 +485,9 @@ export default function App() {
           onAddDocument={openUploadPanel}
           onOpenDocument={openDocument}
           onDeleteDocument={requestDelete}
-        />
+        >
+          {chatList()}
+        </TargetCorpusPanel>
 
         <main className="flex-1 flex flex-col min-w-0 bg-[#F8F6F0] relative overflow-hidden">
           <MainHeader
@@ -435,6 +528,7 @@ export default function App() {
               isDisabled={!isOnline}
               isBusy={isAnswering}
               onSendMessage={handleSend}
+              onStop={stopAnswering}
               onAttachClick={openUploadPanel}
             />
           </div>
@@ -474,10 +568,24 @@ export default function App() {
         errorMessage={deleteError}
       />
 
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[60] bg-[#1C1D1B] text-white px-4 py-2.5 rounded-lg text-xs shadow-lg flex items-center gap-2 border border-neutral-700 animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[calc(100vw-3rem)]">
+      {toast && (
+        <div
+          role="status"
+          className="fixed bottom-6 right-6 z-[60] bg-[#1C1D1B] text-white px-4 py-2.5 rounded-lg text-xs shadow-lg flex items-center gap-2 border border-neutral-700 animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[calc(100vw-3rem)]"
+        >
           <Info className="w-3.5 h-3.5 text-[#C25E00] shrink-0" />
-          <span>{toastMessage}</span>
+          <span className="min-w-0 break-words">{toast.message}</span>
+          {toast.action && (
+            <button
+              onClick={() => {
+                toast.action!.run();
+                setToast(null);
+              }}
+              className="ml-1 font-bold text-[#F4A261] hover:underline shrink-0 cursor-pointer"
+            >
+              {toast.action.label}
+            </button>
+          )}
         </div>
       )}
 
@@ -507,6 +615,7 @@ export default function App() {
         onOpenDocument={openDocument}
         onDeleteDocument={requestDelete}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        chatList={(closeDrawer) => chatList(closeDrawer)}
       />
     </div>
   );
