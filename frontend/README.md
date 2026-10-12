@@ -28,12 +28,13 @@ cross-origin request.
 
 | UI | Endpoint |
 | --- | --- |
-| Startup, offline banner, settings | `GET /health`, `GET /config` |
-| Document list (corpus panel, scope picker) | `GET /documents` |
+| Startup, offline banner, Settings (read-only) | `GET /health`, `GET /config` |
+| Documents panel (pick what to ask about) | `GET /documents` |
 | Upload panel (progress, duplicate, errors) | `POST /upload` |
 | Delete document | `DELETE /documents/{doc_id}` |
 | Asking questions (all documents, or one) | `POST /ask` |
-| "Jump to page" / "View in document" | `GET /documents/{doc_id}/segments` |
+| Search (Ctrl/⌘ K): find passages inside documents | `GET /search` |
+| Document reader ("Read", "Read in document", "Open") | `GET /documents/{doc_id}/segments` |
 
 All calls go through [`src/api.ts`](src/api.ts).
 

@@ -2,9 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   FileText,
   Copy,
-  Quote,
-  Share2,
-  ShieldCheck,
   Check,
   ArrowRight,
   CheckCircle2,
@@ -21,8 +18,6 @@ interface ChatThreadProps {
   messages: ChatMessage[];
   onJumpToPage: (citation: SourceCitation) => void;
   onCopyResponse: (message: ChatMessage) => void;
-  onExportBibTeX: (message: ChatMessage) => void;
-  onShare: () => void;
   onRetry: (message: ChatMessage) => void;
   onUploadClick: () => void;
   onSearchAllDocuments: (message: ChatMessage) => void;
@@ -154,7 +149,7 @@ const AssistantMessage: React.FC<{
   if (message.status === 'not-found') {
     return (
       <div className="space-y-3">
-        <AssistantHeader message={message} badge="Grounded Null Result" />
+        <AssistantHeader message={message} badge="Not found in documents" />
         <div className="p-4 bg-[#F8F6F0] rounded-xl border border-[#E2E0D8] space-y-3">
           <p className="text-sm font-medium text-[#1C1D1B] leading-relaxed">{message.content}</p>
 
@@ -225,12 +220,11 @@ const AssistantMessage: React.FC<{
   }
 
   // Answered
-  const topMatch = citations.length ? Math.max(...citations.map((c) => c.matchScore)) : null;
   const paragraphs = message.content.split(/\n{2,}/);
 
   return (
     <div className="space-y-3.5">
-      <AssistantHeader message={message} badge={`Scope: ${message.scopeLabel}`} />
+      <AssistantHeader message={message} badge={`Searched: ${message.scopeLabel}`} />
 
       <div className="bg-[#FFFFFF] border border-[#E2E0D8] rounded-xl p-5 shadow-xs space-y-4">
         <div className="space-y-3">
@@ -255,33 +249,7 @@ const AssistantMessage: React.FC<{
               <span>{copied ? 'Copied' : 'Copy response'}</span>
             </button>
 
-            {citations.length > 0 && (
-              <button
-                onClick={() => props.onExportBibTeX(message)}
-                className="inline-flex items-center gap-1.5 hover:text-[#1C1D1B] transition-colors cursor-pointer"
-              >
-                <Quote className="w-3.5 h-3.5" />
-                <span>Export BibTeX</span>
-              </button>
-            )}
-
-            <button
-              onClick={props.onShare}
-              className="inline-flex items-center gap-1.5 hover:text-[#1C1D1B] transition-colors cursor-pointer"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Share</span>
-            </button>
           </div>
-
-          {topMatch !== null && (
-            <div className="flex items-center gap-1.5 font-mono text-xs text-[#1C1D1B]" title="Similarity of the best-matching source">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>
-                Top match: <strong className="font-bold">{topMatch}%</strong>
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -290,7 +258,7 @@ const AssistantMessage: React.FC<{
           <div className="flex items-center gap-2 font-mono text-xs font-bold text-[#1C1D1B] uppercase tracking-wider">
             <CheckCircle2 className="w-4 h-4 text-[#C25E00]" />
             <span>
-              {citations.length} SOURCE CITATION{citations.length === 1 ? '' : 'S'}
+              {citations.length} SOURCE{citations.length === 1 ? '' : 'S'}
             </span>
           </div>
 
@@ -318,13 +286,10 @@ const AssistantMessage: React.FC<{
                     </div>
 
                     <span
-                      className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                        citation.matchTag === 'High Match'
-                          ? 'bg-[#E5EFE8] text-[#1E5631] border border-[#C6DEC9]'
-                          : 'bg-[#FFF3E0] text-[#B25E00] border border-[#FFE0B2]'
-                      }`}
+                      className="text-[10px] font-mono px-2 py-0.5 rounded-full shrink-0 bg-[#F8F6F0] text-[#656860] border border-[#E2E0D8]"
+                      title="How similar this passage is to your question. It is not a confidence score."
                     >
-                      {citation.matchScore}% {citation.matchTag}
+                      {citation.matchScore}% similar
                     </span>
                   </div>
 
@@ -338,7 +303,7 @@ const AssistantMessage: React.FC<{
                       onClick={() => props.onJumpToPage(citation)}
                       className="inline-flex items-center gap-1 font-semibold text-xs text-[#C25E00] hover:text-[#8A4A00] hover:underline cursor-pointer shrink-0"
                     >
-                      <span>{citation.page != null ? 'Jump to page' : 'View in document'}</span>
+                      <span>Read in document</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>

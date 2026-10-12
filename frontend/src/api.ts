@@ -37,6 +37,18 @@ export interface ApiAnswer {
   sources: ApiSource[];
 }
 
+/** One passage from GET /search (backend RetrievedChunk). */
+export interface ApiSearchHit {
+  chunk_id: string;
+  doc_id: string;
+  filename: string;
+  text: string;
+  page: number | null;
+  section: string | null;
+  distance: number;
+  similarity: number;
+}
+
 export interface ApiSegment {
   doc_id: string;
   filename: string;
@@ -141,6 +153,12 @@ export const api = {
     request<{ deleted: string }>(`/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' }),
 
   getSegments: (docId: string) => request<ApiSegment[]>(`/documents/${encodeURIComponent(docId)}/segments`),
+
+  search: (query: string, k = 8, docId: string | null = null) => {
+    const params = new URLSearchParams({ q: query, k: String(k) });
+    if (docId) params.set('doc_id', docId);
+    return request<ApiSearchHit[]>(`/search?${params}`);
+  },
 
   ask: (question: string, docId: string | null, signal?: AbortSignal) =>
     request<ApiAnswer>('/ask', {

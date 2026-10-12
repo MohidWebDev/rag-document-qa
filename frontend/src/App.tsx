@@ -3,8 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SidebarRail } from './components/SidebarRail';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { TargetCorpusPanel } from './components/TargetCorpusPanel';
 import { MainHeader } from './components/MainHeader';
 import { OfflineBanner } from './components/OfflineBanner';
@@ -21,15 +20,15 @@ import { api, ApiConfig, ApiError } from './api';
 import {
   ChatMessage,
   DocumentItem,
-  NavTab,
   SourceCitation,
   UploadItem,
   formatTime,
+  ViewerTarget,
   locationLabel,
   toCitation,
   toDocumentItem,
 } from './types';
-import { Folder, BookOpen, LineChart, Info, FileText, Trash2, UploadCloud, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Info, AlertTriangle } from 'lucide-react';
 
 // Used until /config loads; mirrors backend/config.py
 const DEFAULT_ALLOWED_EXTENSIONS = ['.md', '.pdf', '.txt'];
@@ -47,7 +46,6 @@ function extensionOf(name: string): string {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<NavTab>('research-chat');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   // Backend state
@@ -74,7 +72,12 @@ export default function App() {
   // Modals & toast
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [activeViewerCitation, setActiveViewerCitation] = useState<SourceCitation | null>(null);
+  const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
+  // Stable callbacks, so modals' key listeners don't re-subscribe every render
+  const openPalette = useCallback(() => setIsCommandPaletteOpen(true), []);
+  const closePalette = useCallback(() => setIsCommandPaletteOpen(false), []);
+  const closeSettings = useCallback(() => setIsSettingsOpen(false), []);
+  const closeViewer = useCallback(() => setViewerTarget(null), []);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -86,9 +89,8 @@ export default function App() {
 
   const allowedExtensions = config?.allowed_extensions ?? DEFAULT_ALLOWED_EXTENSIONS;
   const maxFileSizeMb = config?.max_file_size_mb ?? DEFAULT_MAX_FILE_SIZE_MB;
-  const totalChunks = documents.reduce((sum, d) => sum + d.chunkCount, 0);
   const scopeLabel = (docId: string | null) =>
-    docId === null ? 'All Documents' : documents.find((d) => d.id === docId)?.name ?? 'this document';
+    docId === null ? 'all documents' : documents.find((d) => d.id === docId)?.name ?? 'this document';
 
   /** Any request that couldn't reach the server flips us into offline mode. */
   const noteError = useCallback((e: unknown) => {
@@ -189,7 +191,6 @@ export default function App() {
         scopeLabel: label,
       },
     ]);
-    setActiveTab('research-chat');
     void runAsk(assistantId, question, docId);
   };
 
@@ -316,16 +317,16 @@ export default function App() {
 
   // ---------- Misc actions ----------
 
-  const selectScope = (docId: string | null) => {
-    setActiveDocId(docId);
-    showToast(`Scope: ${scopeLabel(docId)}`);
-  };
+  const selectScope = (docId: string | null) => setActiveDocId(docId);
 
-  const clearConversation = () => {
+  const newChat = () => {
     setMessages([]);
     void refreshDocuments().catch(() => {});
-    showToast('Conversation cleared.');
   };
+
+  const openDocument = (doc: DocumentItem) => setViewerTarget({ docId: doc.id, docName: doc.name });
+  const openCitation = (citation: SourceCitation) =>
+    setViewerTarget({ docId: citation.docId, docName: citation.docName, citation });
 
   const copyText = (text: string, done: string) => {
     if (!navigator.clipboard) {
@@ -342,69 +343,23 @@ export default function App() {
     messages
       .filter((m) => m.status !== 'loading')
       .map((m) => {
-        if (m.sender === 'user') return `**Q:** ${m.content}`;
+        if (m.sender === 'user') return `Q: ${m.content}`;
         const sources = (m.citations ?? [])
           .map((c) => `  [${c.id}] ${c.docName}${locationLabel(c) ? ` (${locationLabel(c)})` : ''}`)
           .join('\n');
-        return `**A:** ${m.content}${sources ? `\n\nSources:\n${sources}` : ''}`;
+        return `A: ${m.content}${sources ? `\n\nSources:\n${sources}` : ''}`;
       })
       .join('\n\n');
 
-  const exportBibTeX = (message: ChatMessage) => {
-    const byDoc = new Map<string, SourceCitation[]>();
-    (message.citations ?? []).forEach((c) => byDoc.set(c.docId, [...(byDoc.get(c.docId) ?? []), c]));
-    const year = new Date().getFullYear();
-    const entries = [...byDoc.values()].map((cites) => {
-      const name = cites[0].docName;
-      const key = name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9]+/g, '_').toLowerCase() || 'document';
-      const pages = [...new Set(cites.map((c) => c.page).filter((p): p is number => p != null))].sort((a, b) => a - b);
-      const lines = [`  title={${name}}`, `  year={${year}}`, `  note={Cited via AskMyDocs}`];
-      if (pages.length) lines.splice(1, 0, `  pages={${pages.join(',')}}`);
-      return `@misc{${key},\n${lines.join(',\n')}\n}`;
-    });
-    copyText(entries.join('\n\n'), 'BibTeX citation copied to clipboard!');
-  };
+  const activeDocName = activeDocId === null ? null : documents.find((d) => d.id === activeDocId)?.name ?? null;
 
-  const handlePaletteAction = (action: string) => {
-    if (action === 'toggle-open') setIsCommandPaletteOpen(true);
-    else if (action === 'upload') openUploadPanel();
-    else if (action === 'scope-all') selectScope(null);
-    else if (action === 'clear-chat') clearConversation();
-    else if (action.startsWith('scope:')) selectScope(action.slice('scope:'.length));
-  };
-
-  // Every citation shown in this conversation, for the Citations tab
-  const allCitations = useMemo(
-    () =>
-      messages.flatMap((m) =>
-        m.status === 'answered' ? (m.citations ?? []).map((c) => ({ citation: c, question: m.question ?? '' })) : [],
-      ),
-    [messages],
-  );
-
-  const stats = useMemo(() => {
-    const finished = messages.filter((m) => m.sender === 'assistant' && m.status !== 'loading');
-    const answered = finished.filter((m) => m.status === 'answered');
-    const notFound = finished.filter((m) => m.status === 'not-found').length;
-    const topMatches = answered
-      .map((m) => Math.max(0, ...(m.citations ?? []).map((c) => c.matchScore)))
-      .filter((v) => v > 0);
-    const avgTop = topMatches.length ? Math.round(topMatches.reduce((a, b) => a + b, 0) / topMatches.length) : null;
-    return { asked: finished.length, answered: answered.length, notFound, avgTop };
-  }, [messages]);
-
-  const backToChat = (
-    <button
-      onClick={() => setActiveTab('research-chat')}
-      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[#FFFFFF] border border-[#E2E0D8] text-[#1C1D1B]"
-    >
-      ← Back to Chat
-    </button>
-  );
+  // Citations in this conversation that point at the document about to be deleted
+  const deleteTargetCitations = deleteTarget
+    ? messages.reduce((n, m) => n + (m.citations ?? []).filter((c) => c.docId === deleteTarget.id).length, 0)
+    : 0;
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#F8F6F0] text-[#1C1D1B] font-sans">
-      {/* Server offline banner */}
       {!isOnline && <OfflineBanner onRetry={connect} />}
 
       {isOnline && !geminiKeyLoaded && (
@@ -430,227 +385,59 @@ export default function App() {
         }}
       />
 
-      {/* Main Workspace Body (3-Column Layout) */}
       <div className="flex-1 flex overflow-hidden relative">
-        <SidebarRail
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          verifiedChunksCount={totalChunks}
-        />
-
         <TargetCorpusPanel
           documents={documents}
           isLoading={documentsLoading}
           activeDocId={activeDocId}
           onSelectDocument={selectScope}
           onAddDocument={openUploadPanel}
+          onOpenDocument={openDocument}
           onDeleteDocument={requestDelete}
-          config={config}
         />
 
         <main className="flex-1 flex flex-col min-w-0 bg-[#F8F6F0] relative overflow-hidden">
           <MainHeader
-            currentScopeId={activeDocId}
-            onScopeChange={selectScope}
-            documents={documents}
+            scopeName={activeDocName}
+            onClearScope={() => selectScope(null)}
             onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-            onOpenUserModal={() => setIsSettingsOpen(true)}
-            onRefresh={clearConversation}
-            onShare={() =>
-              messages.length
-                ? copyText(conversationAsText(), 'Conversation copied to clipboard!')
-                : showToast('Ask a question first; there is nothing to share yet.')
-            }
+            onNewChat={newChat}
+            onCopyConversation={() => copyText(conversationAsText(), 'Conversation copied to clipboard.')}
+            hasMessages={messages.length > 0}
             onToggleMobileDrawer={() => setIsMobileDrawerOpen(true)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
             isOnline={isOnline}
           />
 
-          {activeTab === 'research-chat' ? (
-            <div className="flex-1 flex flex-col justify-between overflow-y-auto">
-              {messages.length === 0 ? (
-                <EmptyStateHero
-                  hasDocuments={documents.length > 0}
-                  scopeLabel={scopeLabel(activeDocId)}
-                  onSelectPrompt={(q) => askQuestion(q)}
-                  onTriggerUploadClick={openUploadPanel}
-                />
-              ) : (
-                <ChatThread
-                  messages={messages}
-                  onJumpToPage={setActiveViewerCitation}
-                  onCopyResponse={(m) => copyText(m.content, 'Assistant answer copied to clipboard!')}
-                  onExportBibTeX={exportBibTeX}
-                  onShare={() => copyText(conversationAsText(), 'Conversation copied to clipboard!')}
-                  onRetry={retryMessage}
-                  onUploadClick={openUploadPanel}
-                  onSearchAllDocuments={(m) => m.question && askQuestion(m.question, null)}
-                />
-              )}
-              <ChatInputBar
-                placeholder={
-                  documents.length
-                    ? `Ask a question about ${scopeLabel(activeDocId) === 'All Documents' ? 'your documents' : scopeLabel(activeDocId)}...`
-                    : 'Upload a document to start asking questions...'
-                }
-                isDisabled={!isOnline}
-                isBusy={isAnswering}
-                onSendMessage={handleSend}
-                onAttachClick={openUploadPanel}
+          <div className="flex-1 flex flex-col justify-between overflow-y-auto">
+            {messages.length === 0 ? (
+              <EmptyStateHero
+                hasDocuments={documents.length > 0}
+                scopeLabel={activeDocName ?? 'all your documents'}
+                onUploadClick={openUploadPanel}
               />
-            </div>
-          ) : activeTab === 'document-corpus' ? (
-            <div className="flex-1 p-4 sm:p-8 overflow-y-auto">
-              <div className="max-w-3xl mx-auto space-y-4">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-xl font-bold text-[#1C1D1B] flex items-center gap-2">
-                    <Folder className="w-5 h-5 text-[#C25E00]" />
-                    Document Corpus
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={openUploadPanel}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#8A3E00] text-white hover:bg-[#723200]"
-                    >
-                      <UploadCloud className="w-3.5 h-3.5" />
-                      Upload
-                    </button>
-                    {backToChat}
-                  </div>
-                </div>
-                <div className="bg-[#FFFFFF] border border-[#E2E0D8] rounded-xl p-5 shadow-xs divide-y divide-[#E2E0D8]">
-                  {documents.length === 0 ? (
-                    <p className="text-xs text-[#656860] py-3">
-                      {documentsLoading ? 'Loading documents...' : 'No documents uploaded yet.'}
-                    </p>
-                  ) : (
-                    documents.map((doc) => (
-                      <div key={doc.id} className="py-3 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <FileText className="w-4 h-4 text-[#C25E00] shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-[#1C1D1B] truncate">{doc.name}</p>
-                            <p className="text-[10px] font-mono text-[#656860]">
-                              {doc.sizeFormatted} • {doc.date} • {doc.segmentCount}{' '}
-                              {doc.type === 'pdf' ? 'pages' : 'sections'} • {doc.chunkCount} chunks
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            onClick={() => {
-                              setActiveDocId(doc.id);
-                              setActiveTab('research-chat');
-                            }}
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-[#C25E00] hover:underline"
-                          >
-                            Ask <ArrowRight className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => requestDelete(doc)}
-                            className="p-1.5 rounded text-[#656860] hover:text-[#9D0208] hover:bg-[#FEE2E2]"
-                            title={`Delete ${doc.name}`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : activeTab === 'citations-sources' ? (
-            <div className="flex-1 p-4 sm:p-8 overflow-y-auto">
-              <div className="max-w-3xl mx-auto space-y-4">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-xl font-bold text-[#1C1D1B] flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-[#C25E00]" />
-                    Citations &amp; Sources
-                  </h2>
-                  {backToChat}
-                </div>
-                <div className="p-4 bg-white border border-[#E2E0D8] rounded-xl space-y-2">
-                  <p className="text-xs text-[#1C1D1B] font-semibold">Strict Grounding</p>
-                  <p className="text-xs text-[#656860]">
-                    Every answer cites the passages it used as [n]. When no passage is similar enough
-                    {config ? ` (at least ${Math.round((1 - config.retrieval_max_distance) * 100)}%)` : ''}, AskMyDocs
-                    says it couldn't find the answer instead of guessing.
-                  </p>
-                </div>
-                {allCitations.length === 0 ? (
-                  <p className="text-xs text-[#656860]">Citations from your answers in this conversation will show up here.</p>
-                ) : (
-                  <div className="space-y-2.5">
-                    {allCitations.map(({ citation, question }, i) => (
-                      <div key={i} className="p-3.5 bg-white border border-[#E2E0D8] border-l-4 border-l-[#C25E00] rounded-lg space-y-2">
-                        <div className="flex items-center justify-between gap-2 font-mono text-xs">
-                          <span className="font-bold text-[#1C1D1B] truncate">
-                            {citation.docName}
-                            {locationLabel(citation) && <span className="text-[#656860]"> • {locationLabel(citation)}</span>}
-                          </span>
-                          <span className="text-[10px] text-[#656860] shrink-0">{citation.matchScore}% match</span>
-                        </div>
-                        <p className="text-[11px] text-[#656860]">
-                          For: <span className="italic">“{question}”</span>
-                        </p>
-                        <p className="font-mono text-xs text-[#1C1D1B] bg-[#F8F6F0] p-2.5 rounded border border-[#E2E0D8]">
-                          “{citation.snippet}{citation.snippet.length >= 200 ? "…" : ""}”
-                        </p>
-                        <button
-                          onClick={() => setActiveViewerCitation(citation)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#C25E00] hover:underline"
-                        >
-                          View in document <ArrowRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 p-4 sm:p-8 overflow-y-auto">
-              <div className="max-w-3xl mx-auto space-y-4">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-xl font-bold text-[#1C1D1B] flex items-center gap-2">
-                    <LineChart className="w-5 h-5 text-[#C25E00]" />
-                    Analytics &amp; Scope
-                  </h2>
-                  {backToChat}
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[
-                    { label: 'Documents', value: documents.length.toLocaleString() },
-                    { label: 'Indexed chunks', value: totalChunks.toLocaleString() },
-                    { label: 'Questions answered', value: `${stats.answered} / ${stats.asked}` },
-                    { label: 'Avg. top match', value: stats.avgTop === null ? '—' : `${stats.avgTop}%` },
-                  ].map((s) => (
-                    <div key={s.label} className="p-4 bg-white border border-[#E2E0D8] rounded-lg">
-                      <p className="text-[11px] text-[#656860]">{s.label}</p>
-                      <p className="text-2xl font-bold font-mono text-[#1C1D1B] mt-1">{s.value}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-4 bg-white border border-[#E2E0D8] rounded-lg text-xs text-[#656860] space-y-1">
-                  <p>
-                    Current scope: <strong className="text-[#1C1D1B]">{scopeLabel(activeDocId)}</strong>
-                  </p>
-                  <p>
-                    Not found in documents: <strong className="text-[#1C1D1B]">{stats.notFound}</strong> question
-                    {stats.notFound === 1 ? '' : 's'} this session.
-                  </p>
-                  {config && (
-                    <p>
-                      Retrieval: top {config.retrieval_k} passages, min. similarity{' '}
-                      {Math.round((1 - config.retrieval_max_distance) * 100)}%, model{' '}
-                      <code className="font-mono">{config.chat_model}</code>.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+            ) : (
+              <ChatThread
+                messages={messages}
+                onJumpToPage={openCitation}
+                onCopyResponse={(m) => copyText(m.content, 'Answer copied to clipboard.')}
+                onRetry={retryMessage}
+                onUploadClick={openUploadPanel}
+                onSearchAllDocuments={(m) => m.question && askQuestion(m.question, null)}
+              />
+            )}
+            <ChatInputBar
+              placeholder={
+                documents.length
+                  ? `Ask a question about ${activeDocName ?? 'your documents'}...`
+                  : 'Upload a document to start asking questions...'
+              }
+              isDisabled={!isOnline}
+              isBusy={isAnswering}
+              onSendMessage={handleSend}
+              onAttachClick={openUploadPanel}
+            />
+          </div>
         </main>
       </div>
 
@@ -666,11 +453,9 @@ export default function App() {
               onChooseFiles={openFilePicker}
               onDropFiles={handleFiles}
               onDismissItem={(id) => setUploads((prev) => prev.filter((u) => u.id !== id))}
-              onViewExisting={(docId) => {
+              onOpenDocument={(docId, docName) => {
                 setIsUploadPanelOpen(false);
-                setActiveDocId(docId);
-                setActiveTab('research-chat');
-                showToast(`Scope: ${scopeLabel(docId)}`);
+                setViewerTarget({ docId, docName });
               }}
               onClose={() => setIsUploadPanelOpen(false)}
             />
@@ -684,12 +469,11 @@ export default function App() {
         onConfirmDelete={confirmDelete}
         documentName={deleteTarget?.name}
         embeddingsCount={deleteTarget?.chunkCount ?? 0}
-        citationsCount={allCitations.filter((c) => c.citation.docId === deleteTarget?.id).length}
+        citationsCount={deleteTargetCitations}
         isDeleting={isDeleting}
         errorMessage={deleteError}
       />
 
-      {/* Floating Toast Alert */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-[60] bg-[#1C1D1B] text-white px-4 py-2.5 rounded-lg text-xs shadow-lg flex items-center gap-2 border border-neutral-700 animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[calc(100vw-3rem)]">
           <Info className="w-3.5 h-3.5 text-[#C25E00] shrink-0" />
@@ -699,32 +483,30 @@ export default function App() {
 
       <CommandPalette
         isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        onSelectAction={handlePaletteAction}
+        onOpen={openPalette}
+        onClose={closePalette}
         documents={documents}
+        onUpload={openUploadPanel}
+        onNewChat={newChat}
+        onOpenDocument={openDocument}
+        onOpenPassage={openCitation}
       />
 
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} config={config} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={closeSettings} config={config} />
 
-      <DocumentPageViewerModal
-        isOpen={Boolean(activeViewerCitation)}
-        onClose={() => setActiveViewerCitation(null)}
-        citation={activeViewerCitation}
-      />
+      <DocumentPageViewerModal target={viewerTarget} onClose={closeViewer} />
 
       <MobileDrawer
         isOpen={isMobileDrawerOpen}
         onClose={() => setIsMobileDrawerOpen(false)}
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
         documents={documents}
+        isLoading={documentsLoading}
         activeDocId={activeDocId}
         onSelectDocument={selectScope}
-        onOpenSettings={() => setIsSettingsOpen(true)}
         onAddDocument={openUploadPanel}
+        onOpenDocument={openDocument}
         onDeleteDocument={requestDelete}
-        minSimilarityPercent={config ? Math.round((1 - config.retrieval_max_distance) * 100) : undefined}
-        retrievalK={config?.retrieval_k}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
     </div>
   );

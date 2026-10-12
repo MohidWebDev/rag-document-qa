@@ -1,4 +1,4 @@
-import type { ApiDocument, ApiSource } from './api';
+import type { ApiDocument, ApiSearchHit, ApiSource } from './api';
 
 export interface SourceCitation {
   id: number;
@@ -7,8 +7,15 @@ export interface SourceCitation {
   page: number | null;
   section: string | null;
   snippet: string;
+  /** Cosine similarity between the question and the passage, as a percentage (not a confidence score) */
   matchScore: number;
-  matchTag: 'High Match' | 'Medium Match';
+}
+
+/** What the document reader should open: a whole document, optionally scrolled to a cited passage. */
+export interface ViewerTarget {
+  docId: string;
+  docName: string;
+  citation?: SourceCitation;
 }
 
 export type ChatStatus = 'loading' | 'answered' | 'not-found' | 'error';
@@ -58,19 +65,13 @@ export interface UploadItem {
   segmentCount?: number;
 }
 
-export type NavTab = 'research-chat' | 'document-corpus' | 'citations-sources' | 'analytics-scope';
-
-export type RetrievalScope = string;
-
-export interface PromptArchetype {
-  id: string;
-  title: string;
-  iconName: 'file-text' | 'calendar' | 'lightbulb';
-  description: string;
-  sampleQuery: string;
-}
 
 // ---------- Mapping helpers ----------
+
+/** "1 chunk", "3 chunks" */
+export function plural(n: number, word: string, pluralWord = `${word}s`): string {
+  return `${n.toLocaleString()} ${n === 1 ? word : pluralWord}`;
+}
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -96,9 +97,6 @@ export function toDocumentItem(doc: ApiDocument): DocumentItem {
   };
 }
 
-/** Similarity at or above this counts as a "High Match" in the UI. */
-const HIGH_MATCH_SIMILARITY = 0.75;
-
 export function toCitation(source: ApiSource): SourceCitation {
   return {
     id: source.number,
@@ -108,7 +106,20 @@ export function toCitation(source: ApiSource): SourceCitation {
     section: source.section,
     snippet: source.snippet,
     matchScore: Math.round(source.similarity * 100),
-    matchTag: source.similarity >= HIGH_MATCH_SIMILARITY ? 'High Match' : 'Medium Match',
+  };
+}
+
+/** A /search hit shaped like a citation, so the reader can open and highlight it. */
+export function hitToCitation(hit: ApiSearchHit, index: number): SourceCitation {
+  return {
+    id: index + 1,
+    docId: hit.doc_id,
+    docName: hit.filename,
+    page: hit.page,
+    section: hit.section,
+    // Same shape as the backend's citation snippets: whitespace collapsed, first 200 chars
+    snippet: hit.text.split(/\s+/).join(' ').trim().slice(0, 200),
+    matchScore: Math.round(hit.similarity * 100),
   };
 }
 

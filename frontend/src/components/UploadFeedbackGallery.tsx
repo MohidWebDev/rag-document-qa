@@ -9,7 +9,7 @@ import {
   X,
   WifiOff,
 } from 'lucide-react';
-import { UploadItem, formatBytes } from '../types';
+import { UploadItem, formatBytes, plural } from '../types';
 
 interface UploadFeedbackGalleryProps {
   items: UploadItem[];
@@ -18,7 +18,7 @@ interface UploadFeedbackGalleryProps {
   onChooseFiles: () => void;
   onDropFiles: (files: File[]) => void;
   onDismissItem: (id: string) => void;
-  onViewExisting: (docId: string) => void;
+  onOpenDocument: (docId: string, docName: string) => void;
   onClose?: () => void;
 }
 
@@ -35,7 +35,7 @@ export const UploadFeedbackGallery: React.FC<UploadFeedbackGalleryProps> = ({
   onChooseFiles,
   onDropFiles,
   onDismissItem,
-  onViewExisting,
+  onOpenDocument,
   onClose,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -146,15 +146,21 @@ export const UploadFeedbackGallery: React.FC<UploadFeedbackGalleryProps> = ({
                       </span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="font-mono text-[9.5px] px-1.5 py-0.5 rounded bg-[#DCFCE7] text-[#166534] font-bold border border-[#BBF7D0]">
-                        Index ready
-                      </span>
+                      {item.docId && (
+                        <button
+                          onClick={() => onOpenDocument(item.docId!, item.fileName)}
+                          className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#DCFCE7] text-[#166534] font-bold border border-[#BBF7D0] hover:bg-[#BBF7D0] cursor-pointer"
+                          title="Read the extracted text"
+                        >
+                          Open
+                        </button>
+                      )}
                       <DismissButton onClick={() => onDismissItem(item.id)} className="text-[#2D6A4F] hover:bg-[#DCFCE7]" />
                     </div>
                   </div>
                   <p className="font-mono text-[10.5px] text-[#2D6A4F]/80 pl-6">
-                    {item.segmentCount} {item.fileName.toLowerCase().endsWith('.pdf') ? 'pages' : 'sections'} •{' '}
-                    {item.chunkCount} chunks indexed
+                    Ready for questions: {plural(item.segmentCount ?? 0, item.fileName.toLowerCase().endsWith('.pdf') ? 'page' : 'section')} •{' '}
+                    {plural(item.chunkCount ?? 0, 'chunk')}
                   </p>
                 </div>
               );
@@ -174,10 +180,10 @@ export const UploadFeedbackGallery: React.FC<UploadFeedbackGalleryProps> = ({
                     <div className="flex items-center gap-1 shrink-0">
                       {item.docId && (
                         <button
-                          onClick={() => onViewExisting(item.docId!)}
+                          onClick={() => onOpenDocument(item.docId!, item.existingName ?? item.fileName)}
                           className="font-mono text-[10px] text-[#B57614] hover:underline font-bold ml-1 cursor-pointer"
                         >
-                          View existing
+                          Open existing
                         </button>
                       )}
                       <DismissButton onClick={() => onDismissItem(item.id)} className="text-[#B57614] hover:bg-[#FEF3C7]" />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Paperclip, ArrowUp, Lock, ShieldCheck, Loader2 } from 'lucide-react';
+import { Paperclip, ArrowUp, Info, Loader2 } from 'lucide-react';
 
 /** Matches AskRequest.question max_length in backend/main.py */
 const MAX_QUESTION_LENGTH = 1000;
@@ -58,15 +58,8 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                 className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-[#F8F6F0] border border-[#E2E0D8] text-[11px] sm:text-xs font-medium text-[#1C1D1B] hover:bg-[#EFECE6] transition-colors cursor-pointer"
               >
                 <Paperclip className="w-3.5 h-3.5 text-[#656860]" />
-                <span>Attach</span>
+                <span>Upload</span>
               </button>
-
-              {/* Strict Citing Badge */}
-              <div className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-[#FFF3E0] border border-[#FFE0B2] text-[10.5px] sm:text-xs font-medium text-[#C25E00]">
-                <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                <span className="hidden xs:inline">Strict Citing</span>
-                <span className="xs:hidden">Strict</span>
-              </div>
 
             </div>
 
@@ -75,7 +68,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
               <span className="font-mono text-[10.5px] sm:text-[11px] text-[#656860] hidden md:inline">
                 {inputText.length > MAX_QUESTION_LENGTH * 0.8
                   ? `${inputText.length} / ${MAX_QUESTION_LENGTH}`
-                  : 'Press ↵ Enter to synthesize'}
+                  : 'Press Enter to send'}
               </span>
 
               {/* Send Button */}
@@ -87,7 +80,8 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                     ? 'bg-[#8A3E00] text-white hover:bg-[#723200] cursor-pointer shadow-xs'
                     : 'bg-[#8A3E00] text-white cursor-not-allowed opacity-60'
                 }`}
-                title={isBusy ? 'Waiting for the answer...' : 'Send query'}
+                title={isBusy ? 'Waiting for the answer...' : 'Send question'}
+                aria-label="Send question"
               >
                 {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-4 h-4 stroke-[2.4]" />}
               </button>
@@ -97,9 +91,9 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
 
         {/* Bottom Disclaimer */}
         <div className="flex items-center justify-center gap-1.5 text-[10px] sm:text-[10.5px] font-mono text-[#656860] text-center pt-0.5 px-2">
-          <Lock className="w-3 h-3 text-[#656860] shrink-0" />
+          <Info className="w-3 h-3 text-[#656860] shrink-0" />
           <span className="truncate sm:whitespace-normal">
-            AskMyDocs guarantees citation-backed grounded answers.
+            Answers come only from your documents but can still be wrong. Check the cited sources.
           </span>
         </div>
       </form>
